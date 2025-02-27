@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+                   xmlns:xhtml="http://www.w3.org/1999/xhtml"
+                   xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+                   xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+    <url>
+        <loc>http://onenetly.me/download/67b405fc1070c</loc>
+        <lastmod>2025-02-18T07:01:22+01:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>http://onenetly.me/download/67b0e17784ebb</loc>
+        <lastmod>2025-02-18T07:07:40+01:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+        <image:image>
+            <image:loc>http://onenetly.me/download/67b0e17784ebb/download</image:loc>
+            <image:title>OneNetly</image:title>
+        </image:image>
+    </url>
+</urlset>

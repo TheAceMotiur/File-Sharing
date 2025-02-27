@@ -1,0 +1,43 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Base rewrite rules for pretty URLs
+RewriteCond %{THE_REQUEST} \ /+download\.php\?id=([a-zA-Z0-9]+)\ HTTP
+RewriteRule ^ /download/%1? [L,R=301]
+
+# Internal rewrites for download URLs 
+RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L]
+RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L]
+
+# PHP Values - Move these to php.ini if possible
+<IfModule mod_php.c>
+    php_value upload_max_filesize 2048M
+    php_value post_max_size 2048M 
+    php_value memory_limit 2048M
+    php_value max_execution_time 3600
+    php_value max_input_time 3600
+</IfModule>
+
+# Remove .php extension
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^([^/]+)/?$ $1.php [L]
+
+# Cache static assets for 1 week
+<FilesMatch "\.(jpg|jpeg|png|gif|ico|css|js)$">
+    Header set Cache-Control "max-age=604800, public"
+</FilesMatch>
+
+# Add CORS headers
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, OPTIONS"
+Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, X-File-Name"
+
+# Additional headers for proxy support
+Header set X-Frame-Options "ALLOWALL"
+Header set X-Content-Type-Options "nosniff"
+
+# Serve sitemaps
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^sitemaps/sitemap([0-9]+)\.xml$ sitemaps/sitemap$1.xml [L]
+RewriteRule ^sitemaps/sitemap-([0-9]+)\.xml$ sitemaps/sitemap$1.xml [L]
