@@ -4,6 +4,13 @@ session_start();
 require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
+// Initialize default values for variables that might not be set
+$fileName = 'unknown-file';
+$fileSize = 0;
+$fileId = '';
+$error = null;
+$statusCode = null;
+
 function getFileFromCache($fileId) {
     $cacheDir = __DIR__ . '/cache';
     $cachePath = $cacheDir . '/' . $fileId;
@@ -63,7 +70,7 @@ try {
     $db = getDBConnection();
 
     // Validate file ID
-    $fileId = $_GET['id'] ?? '';
+    $fileId = isset($_GET['id']) ? $_GET['id'] : '';
 
     // Validate file ID first
     if (empty($fileId)) {
@@ -80,6 +87,10 @@ try {
             if (!$file) {
                 $error = "File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.";
                 $statusCode = 404;
+            } else {
+                // Set these values as soon as we have the file data
+                $fileName = htmlspecialchars($file['file_name']);
+                $fileSize = number_format($file['size'] / 1024 / 1024, 2);
             }
         } catch (Exception $e) {
             $error = "Error retrieving file";
@@ -93,7 +104,7 @@ try {
     }
 
     // Check if this is a download request
-    if (isset($_GET['download'])) {
+    if (isset($_GET['download']) && !$error) {
         try {
             // Check cache first
             $cachePath = getFileFromCache($fileId);
@@ -125,12 +136,9 @@ try {
             if (!$dropbox) {
                 throw new Exception("Could not find associated Dropbox account");
             }
-            $stmt = $db->prepare("SELECT file_name FROM file_uploads WHERE file_id = ?");
-            $stmt->bind_param("s", $fileId);
-            $stmt->execute();
-            $file = $stmt->get_result()->fetch_assoc();
-
-            if (!$file) {
+            
+            // Already have file info from earlier query, no need to query again
+            if (!isset($file) || !$file) {
                 throw new Exception("File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.");
             }
 
@@ -172,40 +180,57 @@ try {
         }
     }
 
-    // Get file info
-    $stmt = $db->prepare("SELECT * FROM file_uploads WHERE file_id = ? AND upload_status = 'completed'");
-    $stmt->bind_param("s", $fileId);
-    $stmt->execute();
-    $file = $stmt->get_result()->fetch_assoc();
+    // If we reach here without $file being set but no error, we should fetch file data
+    if (!isset($file) && !$error) {
+        try {
+            $stmt = $db->prepare("SELECT * FROM file_uploads WHERE file_id = ? AND upload_status = 'completed'");
+            $stmt->bind_param("s", $fileId);
+            $stmt->execute();
+            $file = $stmt->get_result()->fetch_assoc();
 
-    if (!$file) {
-        throw new Exception("File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.");
+            if ($file) {
+                $fileName = htmlspecialchars($file['file_name']);
+                $fileSize = number_format($file['size'] / 1024 / 1024, 2);
+
+                // Update last download and expires 
+                $stmt = $db->prepare("UPDATE file_uploads SET 
+                    last_download_at = CURRENT_TIMESTAMP,
+                    expires_at = CURRENT_TIMESTAMP + INTERVAL 180 DAY 
+                    WHERE file_id = ?");
+                $stmt->bind_param("s", $fileId);
+                $stmt->execute();
+            } else {
+                $error = "File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.";
+            }
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+        }
     }
 
-    // Get Dropbox temporary link
-    $stmt = $db->prepare("UPDATE file_uploads SET 
-        last_download_at = CURRENT_TIMESTAMP,
-        expires_at = CURRENT_TIMESTAMP + INTERVAL 180 DAY 
-        WHERE file_id = ?");
-    $stmt->bind_param("s", $fileId);
-    $stmt->execute();
-
-    // Instead of getting Dropbox temporary link, create direct download URL
+    // Create direct download URL
     $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
-    $downloadUrl = $directDownloadUrl; // Use direct download URL instead of Dropbox temporary link
-
-    $fileName = htmlspecialchars($file['file_name']);
-    $fileSize = number_format($file['size'] / 1024 / 1024, 2);
-
-    // Handle preview requests directly
-    if (isset($_GET['preview']) && isImageFile($fileName)) {
-        header('Location: ' . $directDownloadUrl);
-        exit;
-    }
+    $downloadUrl = $directDownloadUrl;
 
 } catch (Exception $e) {
     // Set error variable instead of using die()
     $error = $e->getMessage();
+}
+
+// Fixed function to safely check mime type
+function safeGetMimeType($fileName) {
+    // Use a default mime type if we can't determine it
+    $defaultMimeType = 'application/octet-stream';
+    
+    try {
+        // Only attempt to get mime_content_type if file actually exists
+        if (file_exists($fileName)) {
+            return mime_content_type($fileName);
+        }
+    } catch (Exception $e) {
+        // Just return default if any error
+    }
+    
+    return $defaultMimeType;
 }
 ?>
 
@@ -224,7 +249,6 @@ try {
     
     // Determine if file is an image and set preview URL
     $isImage = isImageFile($fileName);
-    $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
     $previewImage = $isImage ? $directDownloadUrl : "https://" . $_SERVER['HTTP_HOST'] . "/icon.png";
     ?>
     
@@ -245,7 +269,7 @@ try {
     <meta property="og:description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <meta property="og:image" content="<?php echo htmlspecialchars($previewImage); ?>">
     <?php if ($isImage): ?>
-    <meta property="og:image:type" content="<?php echo mime_content_type($fileName); ?>">
+    <meta property="og:image:type" content="<?php echo safeGetMimeType($fileName); ?>">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Preview of <?php echo htmlspecialchars($fileName); ?>">
@@ -280,7 +304,7 @@ try {
             "@type": "DigitalDocument",
             "name": "<?php echo htmlspecialchars($fileName); ?>",
             "fileFormat": "<?php echo pathinfo($fileName, PATHINFO_EXTENSION); ?>",
-            "dateModified": "<?php echo $file['last_download_at'] ?? ''; ?>",
+            "dateModified": "<?php echo isset($file['last_download_at']) ? $file['last_download_at'] : ''; ?>",
             "contentSize": "<?php echo $fileSize; ?> MB"
         },
         "publisher": {
@@ -376,7 +400,6 @@ try {
                         <p class="font-medium text-gray-900"><?php echo $fileName; ?></p>
                         <p class="text-sm text-gray-500 mt-2">Size: <?php echo $fileSize; ?> MB</p>
                     </div>
-
                 </div>
 
                 <!-- Action Buttons -->
