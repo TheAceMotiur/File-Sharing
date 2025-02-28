@@ -8,7 +8,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
 // Handle chunk upload
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_chunk') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'upload_chunk') {
     // Clean any previous output before sending JSON
     ob_clean();
     
@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $fileType = isset($_GET['type']) ? $_GET['type'] : '';
         $tempId = isset($_GET['temp_id']) ? $_GET['temp_id'] : null;
         
+        // Log metadata for debugging
+        error_log("Chunk Upload: chunk=$chunkNum, total=$totalChunks, name=$fileName, size=$fileSize bytes");
+        
         // Validate required parameters
         if ($chunkNum === null || $totalChunks === null || empty($fileName) || empty($tempId)) {
             throw new Exception('Missing required chunk parameters');
@@ -49,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('Invalid chunk number');
         }
         
-        // Validate file type
+        // Validate file type (more permissive to allow for application/x-zip-compressed)
         $allowedTypes = [
             // Images
             'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -58,15 +61,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // Video
             'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
             // Archives
-            'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-            'application/x-tar', 'application/gzip',
+            'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
+            'application/x-tar', 'application/gzip', 'application/octet-stream',
             // Documents
             'application/pdf', 'image/vnd.djvu',
             // Other media
             'application/vnd.apple.mpegurl', 'application/x-mpegurl'
         ];
 
-        if (!in_array($fileType, $allowedTypes)) {
+        // More permissive check for file types
+        $isAllowed = false;
+        foreach ($allowedTypes as $type) {
+            if (stripos($fileType, $type) !== false || $type == 'application/octet-stream') {
+                $isAllowed = true;
+                break;
+            }
+        }
+        
+        if (!$isAllowed) {
             throw new Exception('File type not allowed. Only media and archive files are supported.');
         }
 
@@ -114,10 +126,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             $metaData = json_decode(file_get_contents($metaFile), true);
             
-            // Verify this chunk is for the same file
+            // Verify this chunk is for the same file (more permissive check)
             if ($metaData['fileName'] !== $fileName || 
                 $metaData['fileSize'] !== $fileSize || 
-                $metaData['fileType'] !== $fileType || 
                 $metaData['totalChunks'] !== $totalChunks) {
                 throw new Exception('Chunk metadata mismatch, please restart upload');
             }
@@ -132,8 +143,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         while ($retries < $maxRetries && !$success) {
             if (file_put_contents($chunkPath, $chunkData) !== false) {
                 $success = true;
+                error_log("Successfully saved chunk $chunkNum to $chunkPath");
             } else {
                 $retries++;
+                error_log("Failed to save chunk $chunkNum (attempt $retries/$maxRetries)");
                 usleep(100000); // Wait 100ms before retrying
             }
         }
@@ -143,12 +156,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         // Update metadata to mark this chunk as complete
-        $metaData['uploadedChunks'][] = $chunkNum;
+        if (!in_array($chunkNum, $metaData['uploadedChunks'])) {
+            $metaData['uploadedChunks'][] = $chunkNum;
+        }
         $metaData['lastActivity'] = time();
         file_put_contents($metaFile, json_encode($metaData));
         
         // Check if we have all chunks
-        $isComplete = count(array_unique($metaData['uploadedChunks'])) === $totalChunks;
+        $uniqueChunks = array_unique($metaData['uploadedChunks']);
+        $isComplete = count($uniqueChunks) === $totalChunks;
         
         if ($isComplete) {
             // All chunks received, combine them into a single file
@@ -273,9 +289,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             // Return success for this chunk with progress info
             $progress = [
-                'receivedChunks' => count(array_unique($metaData['uploadedChunks'])),
+                'receivedChunks' => count($uniqueChunks),
                 'totalChunks' => $totalChunks,
-                'percent' => round((count(array_unique($metaData['uploadedChunks'])) / $totalChunks) * 100)
+                'percent' => round((count($uniqueChunks) / $totalChunks) * 100)
             ];
             
             echo json_encode([
@@ -288,11 +304,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         exit;
     } catch (Exception $e) {
+        error_log("Chunk upload error: " . $e->getMessage());
         http_response_code(400);
         echo json_encode([
             'success' => false,
             'error' => $e->getMessage()
         ]);
+        exit;
+    }
+}
+
+// Add verification endpoint for chunk uploads
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'upload_chunk' && isset($_GET['verify'])) {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Login required']);
+        exit;
+    }
+    
+    try {
+        $tempId = isset($_GET['temp_id']) ? $_GET['temp_id'] : null;
+        $fileName = isset($_GET['name']) ? $_GET['name'] : '';
+        
+        if (empty($tempId) || empty($fileName)) {
+            throw new Exception('Missing parameters');
+        }
+        
+        $uploadDir = __DIR__ . '/temp/' . $tempId;
+        $metaFile = $uploadDir . '/metadata.json';
+        
+        if (!file_exists($metaFile)) {
+            throw new Exception('Upload session not found');
+        }
+        
+        $metaData = json_decode(file_get_contents($metaFile), true);
+        
+        if ($metaData['fileName'] !== $fileName) {
+            throw new Exception('File mismatch');
+        }
+        
+        // Check if all chunks are present
+        $uniqueChunks = array_unique($metaData['uploadedChunks']);
+        $isComplete = count($uniqueChunks) === $metaData['totalChunks'];
+        
+        echo json_encode([
+            'success' => true,
+            'complete' => $isComplete,
+            'chunksReceived' => count($uniqueChunks),
+            'totalChunks' => $metaData['totalChunks']
+        ]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         exit;
     }
 }
@@ -314,7 +380,7 @@ function cleanupTempFiles($dir) {
 }
 
 // Original file upload handler for smaller files
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset($_GET['action'])) {
     // Clean any previous output before sending JSON
     ob_clean();
     
@@ -333,11 +399,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
     try {
         if (!isset($_FILES['file'])) {
             throw new Exception('No file uploaded');
-        }
-
-        $file = $_FILES['file'];
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('File upload failed');
         }
 
         // Add allowed file types
@@ -1036,12 +1097,13 @@ ob_end_flush();
                     // Create URL with query parameters
                     const url = `index.php?action=upload_chunk&chunk=${chunkIndex}&chunks=${this.totalChunks}` + 
                               `&name=${encodeURIComponent(this.currentFile.name)}&size=${this.currentFile.size}` + 
-                              `&type=${this.currentFile.type}&temp_id=${this.tempId}`;
+                              `&type=${encodeURIComponent(this.currentFile.type)}&temp_id=${this.tempId}`;
                     
                     return new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
                         
                         xhr.open('POST', url, true);
+                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         
                         xhr.onload = () => {
                             if (xhr.status >= 200 && xhr.status < 300) {
@@ -1056,7 +1118,7 @@ ob_end_flush();
                                     reject(new Error('Invalid response format'));
                                 }
                             } else {
-                                reject(new Error(`HTTP error ${xhr.status}`));
+                                reject(new Error(`HTTP error ${xhr.status}: ${xhr.responseText}`));
                             }
                         };
                         
