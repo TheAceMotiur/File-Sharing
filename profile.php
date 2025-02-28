@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login');
     exit;
 }
-
+ 
 try {
     // Include database configuration and get connection
     $db = getDBConnection();
