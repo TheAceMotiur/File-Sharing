@@ -1,4 +1,6 @@
 <?php
+session_start();
+
 $host = '184.164.80.178';
 $db   = 'onenetly_home';
 $user = 'onenetly_home';
@@ -14,7 +16,21 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
+    $_SESSION['success'] = "Database connection successful!";
 } catch (\PDOException $e) {
-    throw new \PDOException($e->getMessage(), (int)$e->getCode());
+    $_SESSION['error'] = "Connection failed: " . $e->getMessage();
+    error_log("Database Error: " . $e->getMessage());
+}
+
+// Function to display messages
+function displayMessage() {
+    if(isset($_SESSION['error'])) {
+        echo '<div class="alert alert-danger">' . $_SESSION['error'] . '</div>';
+        unset($_SESSION['error']);
+    }
+    if(isset($_SESSION['success'])) {
+        echo '<div class="alert alert-success">' . $_SESSION['success'] . '</div>';
+        unset($_SESSION['success']);
+    }
 }
 ?>
