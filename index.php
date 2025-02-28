@@ -1,4 +1,7 @@
 <?php
+// Start output buffering to prevent any unwanted output before JSON response
+ob_start();
+
 require_once __DIR__ . '/config.php';
 session_start();
 require_once __DIR__ . '/vendor/autoload.php';
@@ -6,6 +9,9 @@ use Spatie\Dropbox\Client as DropboxClient;
 
 // Handle chunk upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_chunk') {
+    // Clean any previous output before sending JSON
+    ob_clean();
+    
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
@@ -164,6 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Original file upload handler for smaller files
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
+    // Clean any previous output before sending JSON
+    ob_clean();
+    
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
@@ -285,6 +294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
         exit;
     }
 }
+
+// If we reach here, it's a normal page request, so we flush the buffer
+// before sending HTML content
+ob_end_flush();
 ?>
 <!DOCTYPE html>
 <html lang="en">
