@@ -1,0 +1,54 @@
+<?php
+// First, check and close any active session
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
+// Configure session settings
+session_set_cookie_params([
+    'lifetime' => 30 * 24 * 60 * 60,
+    'path' => '/',
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
+
+// Set garbage collection lifetime
+ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
+
+
+
+define('RECAPTCHA_SITE_KEY', '6LfEK8oqAAAAAA4X-xursRqDCIMD4AxPyWjyeIEw');
+define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
+
+function getDBConnection() {
+    static $db = null;
+    
+    if ($db === null) {
+        $host = '37.211.159.106';
+        $dbname = 'onenetly_home';
+        $username = 'onenetly_home';
+        $password = 'AmiMotiur27@';
+
+        try {
+            $db = new mysqli($host, $username, $password, $dbname);
+
+            if ($db->connect_error) {
+                throw new Exception("Connection failed: " . $db->connect_error);
+            }
+
+            // Set charset to utf8mb4
+            $db->set_charset('utf8mb4');
+
+            // Set error reporting
+            mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+        } catch(Exception $e) {
+            error_log("Database connection failed: " . $e->getMessage());
+            die("Connection failed. Please check database configuration.");
+        }
+    }
+    
+    return $db;
+}
+?>
