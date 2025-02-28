@@ -27,15 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     try {
         // Get chunk data and metadata
         $chunkData = file_get_contents('php://input');
-        $chunkNum = isset($_GET['chunk']) ? (int)$_GET['chunk'] : 0;
-        $totalChunks = isset($_GET['chunks']) ? (int)$_GET['chunks'] : 0;
+        
+        if (empty($chunkData)) {
+            throw new Exception('No chunk data received');
+        }
+        
+        $chunkNum = isset($_GET['chunk']) ? (int)$_GET['chunk'] : null;
+        $totalChunks = isset($_GET['chunks']) ? (int)$_GET['chunks'] : null;
         $fileName = isset($_GET['name']) ? $_GET['name'] : '';
         $fileSize = isset($_GET['size']) ? (int)$_GET['size'] : 0;
         $fileType = isset($_GET['type']) ? $_GET['type'] : '';
-        $tempId = isset($_GET['temp_id']) ? $_GET['temp_id'] : uniqid();
+        $tempId = isset($_GET['temp_id']) ? $_GET['temp_id'] : null;
         
-        if (empty($fileName) || $totalChunks <= 0) {
-            throw new Exception('Invalid chunk upload request');
+        // Validate required parameters
+        if ($chunkNum === null || $totalChunks === null || empty($fileName) || empty($tempId)) {
+            throw new Exception('Missing required chunk parameters');
+        }
+        
+        // Validate chunk number in range
+        if ($chunkNum < 0 || $chunkNum >= $totalChunks) {
+            throw new Exception('Invalid chunk number');
         }
         
         // Validate file type
@@ -64,29 +75,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('File size exceeds 2 GB limit');
         }
 
-        // Create temp directory if it doesn't exist
-        $tempDir = __DIR__ . '/temp';
-        if (!is_dir($tempDir)) {
-            mkdir($tempDir, 0777, true);
+        // Create temp directory structure if it doesn't exist
+        $tempBaseDir = __DIR__ . '/temp';
+        if (!is_dir($tempBaseDir)) {
+            if (!mkdir($tempBaseDir, 0777, true)) {
+                throw new Exception('Failed to create temp directory');
+            }
         }
         
-        // Save chunk to temporary file
-        $chunkPath = $tempDir . '/' . $tempId . '_' . $chunkNum;
-        file_put_contents($chunkPath, $chunkData);
+        // Create upload-specific directory to keep chunks organized
+        $uploadDir = $tempBaseDir . '/' . $tempId;
+        if (!is_dir($uploadDir)) {
+            if (!mkdir($uploadDir, 0777, true)) {
+                throw new Exception('Failed to create upload directory');
+            }
+            
+            // Create a metadata file to track upload details
+            $metaData = [
+                'fileName' => $fileName,
+                'fileSize' => $fileSize,
+                'fileType' => $fileType,
+                'totalChunks' => $totalChunks,
+                'uploadedChunks' => [],
+                'startTime' => time(),
+                'userId' => $_SESSION['user_id']
+            ];
+            
+            $metaFile = $uploadDir . '/metadata.json';
+            if (!file_put_contents($metaFile, json_encode($metaData))) {
+                throw new Exception('Failed to create upload metadata');
+            }
+        } else {
+            // Load and verify metadata
+            $metaFile = $uploadDir . '/metadata.json';
+            if (!file_exists($metaFile)) {
+                throw new Exception('Upload metadata missing, please restart upload');
+            }
+            
+            $metaData = json_decode(file_get_contents($metaFile), true);
+            
+            // Verify this chunk is for the same file
+            if ($metaData['fileName'] !== $fileName || 
+                $metaData['fileSize'] !== $fileSize || 
+                $metaData['fileType'] !== $fileType || 
+                $metaData['totalChunks'] !== $totalChunks) {
+                throw new Exception('Chunk metadata mismatch, please restart upload');
+            }
+        }
         
-        // If this is the last chunk, combine all chunks and process the complete file
-        if ($chunkNum === $totalChunks - 1) {
-            // Combine chunks into a single file
-            $completePath = $tempDir . '/' . $tempId . '_complete';
+        // Save chunk with retry logic
+        $chunkPath = $uploadDir . '/chunk_' . $chunkNum;
+        $maxRetries = 3;
+        $retries = 0;
+        $success = false;
+        
+        while ($retries < $maxRetries && !$success) {
+            if (file_put_contents($chunkPath, $chunkData) !== false) {
+                $success = true;
+            } else {
+                $retries++;
+                usleep(100000); // Wait 100ms before retrying
+            }
+        }
+        
+        if (!$success) {
+            throw new Exception("Failed to save chunk $chunkNum after $maxRetries attempts");
+        }
+        
+        // Update metadata to mark this chunk as complete
+        $metaData['uploadedChunks'][] = $chunkNum;
+        $metaData['lastActivity'] = time();
+        file_put_contents($metaFile, json_encode($metaData));
+        
+        // Check if we have all chunks
+        $isComplete = count(array_unique($metaData['uploadedChunks'])) === $totalChunks;
+        
+        if ($isComplete) {
+            // All chunks received, combine them into a single file
+            $completePath = $uploadDir . '/complete_' . $fileName;
             $completeFile = fopen($completePath, 'wb');
             
-            for ($i = 0; $i < $totalChunks; $i++) {
-                $chunkPath = $tempDir . '/' . $tempId . '_' . $i;
-                $chunk = file_get_contents($chunkPath);
-                fwrite($completeFile, $chunk);
-                unlink($chunkPath); // Delete chunk after combining
+            if (!$completeFile) {
+                throw new Exception('Failed to create complete file');
             }
+            
+            // Combine chunks in order
+            $errors = [];
+            for ($i = 0; $i < $totalChunks; $i++) {
+                $chunkPath = $uploadDir . '/chunk_' . $i;
+                if (!file_exists($chunkPath)) {
+                    $errors[] = "Missing chunk $i";
+                    continue;
+                }
+                
+                $chunk = file_get_contents($chunkPath);
+                if ($chunk === false) {
+                    $errors[] = "Failed to read chunk $i";
+                    continue;
+                }
+                
+                if (fwrite($completeFile, $chunk) === false) {
+                    $errors[] = "Failed to write chunk $i to complete file";
+                }
+            }
+            
             fclose($completeFile);
+            
+            if (!empty($errors)) {
+                throw new Exception('Errors combining file: ' . implode(', ', $errors));
+            }
+            
+            // Verify the final file size
+            $actualSize = filesize($completePath);
+            if ($actualSize !== $fileSize) {
+                throw new Exception("File size mismatch: expected $fileSize bytes, got $actualSize bytes");
+            }
             
             // Get Dropbox credentials with available storage
             $db = getDBConnection();
@@ -111,9 +214,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // Generate unique file ID
             $fileId = uniqid();
             
-            // Upload to Dropbox
+            // Upload to Dropbox with retry logic
             $dropboxPath = "/{$fileId}/{$fileName}";
-            $client->upload($dropboxPath, fopen($completePath, 'r'), 'add');
+            $uploaded = false;
+            $uploadRetries = 0;
+            $maxUploadRetries = 3;
+            
+            while (!$uploaded && $uploadRetries < $maxUploadRetries) {
+                try {
+                    $client->upload($dropboxPath, fopen($completePath, 'r'), 'add');
+                    $uploaded = true;
+                } catch (Exception $e) {
+                    $uploadRetries++;
+                    if ($uploadRetries >= $maxUploadRetries) {
+                        throw new Exception('Failed to upload to Dropbox after multiple attempts: ' . $e->getMessage());
+                    }
+                    sleep(2); // Wait before retrying
+                }
+            }
             
             // Save file info to database with the selected Dropbox account
             $stmt = $db->prepare("INSERT INTO file_uploads (
@@ -136,24 +254,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $dropbox['id'],
                 $_SESSION['user_id']
             );
-            $stmt->execute();
+            
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to save file data to database: ' . $stmt->error);
+            }
 
-            // Delete the complete file
-            unlink($completePath);
+            // Clean up the temporary files
+            cleanupTempFiles($uploadDir);
 
             $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
             
             echo json_encode([
                 'success' => true,
                 'downloadLink' => $downloadLink,
-                'complete' => true
+                'complete' => true,
+                'fileId' => $fileId
             ]);
         } else {
-            // Return success for this chunk
+            // Return success for this chunk with progress info
+            $progress = [
+                'receivedChunks' => count(array_unique($metaData['uploadedChunks'])),
+                'totalChunks' => $totalChunks,
+                'percent' => round((count(array_unique($metaData['uploadedChunks'])) / $totalChunks) * 100)
+            ];
+            
             echo json_encode([
                 'success' => true,
                 'chunk' => $chunkNum,
                 'temp_id' => $tempId,
+                'progress' => $progress,
                 'complete' => false
             ]);
         }
@@ -166,6 +295,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ]);
         exit;
     }
+}
+
+// Helper function to clean up temporary files
+function cleanupTempFiles($dir) {
+    if (!is_dir($dir)) {
+        return;
+    }
+    
+    $files = glob($dir . '/*');
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+    
+    rmdir($dir);
 }
 
 // Original file upload handler for smaller files
@@ -487,7 +632,8 @@ ob_end_flush();
                                             Uploading large file ({{ formatFileSize(fileSize) }})
                                         </p>
                                         <p class="text-xs text-gray-500">
-                                            Chunk {{ currentChunk + 1 }} of {{ totalChunks }}
+                                            Chunk {{ currentChunk + 1 }} of {{ totalChunks }} 
+                                            <span v-if="chunkRetries > 0">(Retry: {{ chunkRetries }})</span>
                                         </p>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-3">
@@ -500,6 +646,9 @@ ob_end_flush();
                                     </p>
                                     <p class="text-xs text-gray-500" v-if="uploadSpeed">
                                         {{ uploadSpeed }} | {{ timeRemaining }}
+                                    </p>
+                                    <p v-if="uploadError" class="text-xs text-red-500 mt-2">
+                                        {{ uploadError }} <button @click="retryCurrentChunk" class="text-blue-500 underline ml-1">Retry</button>
                                     </p>
                                 </div>
                             </div>
@@ -669,7 +818,19 @@ ob_end_flush();
                     currentChunk: 0,
                     totalChunks: 0,
                     uploadSpeed: '',
-                    timeRemaining: ''
+                    timeRemaining: '',
+                    uploadError: '',
+                    chunkRetries: 0,
+                    maxChunkRetries: 3,
+                    tempId: '',
+                    currentFile: null,
+                    uploadStartTime: null,
+                    chunkSize: 5 * 1024 * 1024, // 5MB chunks by default
+                    uploadStats: {
+                        totalBytes: 0,
+                        uploadedBytes: 0,
+                        startTime: 0
+                    }
                 }
             },
             methods: {
@@ -717,13 +878,35 @@ ob_end_flush();
 
                     this.uploading = true;
                     this.progress = 0;
-                    this.isLargeFile = file.size > 100 * 1024 * 1024; // Consider large if > 100MB
+                    this.uploadError = '';
+                    this.chunkRetries = 0;
+                    this.currentFile = file;
                     this.fileSize = file.size;
                     
-                    if (this.isLargeFile) {
-                        await this.uploadLargeFile(file);
+                    // Adjust chunk size based on file size for better performance
+                    if (file.size > 500 * 1024 * 1024) {
+                        this.chunkSize = 10 * 1024 * 1024; // 10MB for files > 500MB
+                    } else if (file.size > 100 * 1024 * 1024) {
+                        this.chunkSize = 5 * 1024 * 1024; // 5MB for files > 100MB
+                    } else if (file.size > 10 * 1024 * 1024) {
+                        this.chunkSize = 2 * 1024 * 1024; // 2MB for files > 10MB
                     } else {
-                        await this.uploadSmallFile(file);
+                        this.chunkSize = 1 * 1024 * 1024; // 1MB for smaller files
+                    }
+                    
+                    // Determine if we should use chunked upload
+                    this.isLargeFile = file.size > 10 * 1024 * 1024; // Consider large if > 10MB
+                    
+                    try {
+                        if (this.isLargeFile) {
+                            await this.uploadLargeFile(file);
+                        } else {
+                            await this.uploadSmallFile(file);
+                        }
+                    } catch (error) {
+                        console.error('Upload failed:', error);
+                        this.uploadError = `Upload failed: ${error.message}`;
+                        this.uploading = false;
                     }
                 },
                 async uploadSmallFile(file) {
@@ -738,6 +921,7 @@ ob_end_flush();
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
                                 this.progress = Math.round((e.loaded * 100) / e.total);
+                                this.updateUploadStats(e.loaded);
                             }
                         });
 
@@ -780,130 +964,243 @@ ob_end_flush();
                     }
                 },
                 async uploadLargeFile(file) {
-                    const chunkSize = 10 * 1024 * 1024; // 10MB per chunk
-                    this.totalChunks = Math.ceil(file.size / chunkSize);
+                    this.totalChunks = Math.ceil(file.size / this.chunkSize);
                     this.currentChunk = 0;
-                    const tempId = Date.now().toString();
-                    let startTime = Date.now();
+                    this.tempId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+                    this.uploadStartTime = Date.now();
+                    
+                    // Setup upload stats tracking
+                    this.uploadStats = {
+                        totalBytes: file.size,
+                        uploadedBytes: 0,
+                        startTime: Date.now()
+                    };
 
-                    for (let i = 0; i < this.totalChunks; i++) {
-                        const start = i * chunkSize;
-                        const end = Math.min(start + chunkSize, file.size);
-                        const chunk = file.slice(start, end);
-
-                        const formData = new FormData();
-                        formData.append('action', 'upload_chunk');
-                        formData.append('chunk', i);
-                        formData.append('chunks', this.totalChunks);
-                        formData.append('name', file.name);
-                        formData.append('size', file.size);
-                        formData.append('type', file.type);
-                        formData.append('temp_id', tempId);
-
-                        try {
-                            const xhr = new XMLHttpRequest();
-                            const uploadPromise = new Promise((resolve, reject) => {
-                                xhr.onload = () => {
-                                    if (xhr.status >= 200 && xhr.status < 300) {
-                                        try {
-                                            const response = JSON.parse(xhr.responseText);
-                                            resolve(response);
-                                        } catch (e) {
-                                            reject(new Error('Invalid JSON response'));
-                                        }
-                                    } else {
-                                        reject(new Error('Upload failed'));
+                    NProgress.start();
+                    
+                    // Process chunks sequentially with reliability improvements
+                    try {
+                        for (let i = 0; i < this.totalChunks; i++) {
+                            this.currentChunk = i;
+                            this.chunkRetries = 0;
+                            
+                            let uploadSuccess = false;
+                            
+                            // Retry logic for each chunk
+                            while (!uploadSuccess && this.chunkRetries < this.maxChunkRetries) {
+                                try {
+                                    await this.uploadChunk(i);
+                                    uploadSuccess = true;
+                                } catch (error) {
+                                    this.chunkRetries++;
+                                    this.uploadError = `Error uploading chunk ${i+1}: ${error.message}`;
+                                    
+                                    if (this.chunkRetries >= this.maxChunkRetries) {
+                                        throw new Error(`Failed to upload chunk ${i+1} after ${this.maxChunkRetries} attempts`);
                                     }
-                                };
-                                xhr.onerror = () => reject(new Error('Network error'));
+                                    
+                                    // Wait before retrying (exponential backoff)
+                                    const delay = Math.min(1000 * Math.pow(2, this.chunkRetries - 1), 10000);
+                                    await new Promise(resolve => setTimeout(resolve, delay));
+                                }
+                            }
+                            
+                            // Update progress
+                            this.progress = Math.round(((i + 1) * 100) / this.totalChunks);
+                            this.updateUploadStats((i + 1) * this.chunkSize);
+                        }
+                        
+                        // Final check to ensure all chunks were uploaded
+                        const verificationResponse = await this.verifyUpload();
+                        
+                        if (verificationResponse.complete) {
+                            this.downloadLink = verificationResponse.downloadLink;
+                            this.showDownloadSection = true;
+                        } else {
+                            throw new Error('Upload verification failed');
+                        }
+                    } catch (error) {
+                        console.error('Chunked upload error:', error);
+                        this.uploadError = `Upload failed: ${error.message}`;
+                        throw error;
+                    } finally {
+                        this.uploading = false;
+                        NProgress.done();
+                    }
+                },
+                async uploadChunk(chunkIndex) {
+                    const start = chunkIndex * this.chunkSize;
+                    const end = Math.min(start + this.chunkSize, this.currentFile.size);
+                    const chunk = this.currentFile.slice(start, end);
+                    
+                    // Create URL with query parameters
+                    const url = `index.php?action=upload_chunk&chunk=${chunkIndex}&chunks=${this.totalChunks}` + 
+                              `&name=${encodeURIComponent(this.currentFile.name)}&size=${this.currentFile.size}` + 
+                              `&type=${this.currentFile.type}&temp_id=${this.tempId}`;
+                    
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        
+                        xhr.open('POST', url, true);
+                        
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                try {
+                                    const response = JSON.parse(xhr.responseText);
+                                    if (response.success) {
+                                        resolve(response);
+                                    } else {
+                                        reject(new Error(response.error || 'Upload failed'));
+                                    }
+                                } catch (e) {
+                                    reject(new Error('Invalid response format'));
+                                }
+                            } else {
+                                reject(new Error(`HTTP error ${xhr.status}`));
+                            }
+                        };
+                        
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.ontimeout = () => reject(new Error('Upload timeout'));
+                        
+                        // Add progress tracking for each chunk
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const chunkProgress = (e.loaded / e.total) * 100;
+                                this.progress = Math.round((chunkIndex * 100 / this.totalChunks) + (chunkProgress / this.totalChunks));
+                                
+                                // Update upload stats based on current chunk progress
+                                const totalUploaded = (chunkIndex * this.chunkSize) + e.loaded;
+                                this.updateUploadStats(totalUploaded);
+                            }
+                        };
+                        
+                        // Set timeout for larger chunks
+                        xhr.timeout = 120000; // 2 minutes
+                        
+                        xhr.send(chunk);
+                    });
+                },
+                async verifyUpload() {
+                    // Create URL with query parameters for verification
+                    const url = `index.php?action=upload_chunk&verify=true` + 
+                              `&name=${encodeURIComponent(this.currentFile.name)}&size=${this.currentFile.size}` + 
+                              `&type=${this.currentFile.type}&temp_id=${this.tempId}`;
+                    
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, true);
+                        
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                try {
+                                    const response = JSON.parse(xhr.responseText);
+                                    resolve(response);
+                                } catch (e) {
+                                    reject(new Error('Invalid response format'));
+                                }
+                            } else {
+                                reject(new Error(`HTTP error ${xhr.status}`));
+                            }
+                        };
+                        
+                        xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.send();
+                    });
+                },
+                retryCurrentChunk() {
+                    if (this.currentFile && this.uploading) {
+                        this.uploadError = '';
+                        this.chunkRetries = 0;
+                        this.uploadChunk(this.currentChunk)
+                            .then(response => {
+                                if (response.complete) {
+                                    this.downloadLink = response.downloadLink;
+                                    this.showDownloadSection = true;
+                                    this.uploading = false;
+                                } else {
+                                    this.currentChunk++;
+                                    if (this.currentChunk < this.totalChunks) {
+                                        this.uploadChunk(this.currentChunk);
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                this.uploadError = `Retry failed: ${error.message}`;
                             });
-
-                            xhr.open('POST', `index.php?action=upload_chunk&chunk=${i}&chunks=${this.totalChunks}&name=${encodeURIComponent(file.name)}&size=${file.size}&type=${file.type}&temp_id=${tempId}`, true);
-                            xhr.send(chunk);
-
-                            const response = await uploadPromise;
-
-                            if (!response.success) {
-                                throw new Error(response.error || 'Upload failed');
-                            }
-
-                            this.currentChunk = i + 1;
-                            this.progress = Math.round((this.currentChunk * 100) / this.totalChunks);
-
-                            // Calculate upload speed and time remaining
-                            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-                            const uploadedSize = (i + 1) * chunkSize;
-                            const speed = uploadedSize / elapsedTime; // bytes per second
-                            this.uploadSpeed = `${(speed / 1024 / 1024).toFixed(2)} MB/s`;
-                            const remainingSize = file.size - uploadedSize;
-                            const remainingTime = remainingSize / speed; // in seconds
-                            this.timeRemaining = `${Math.ceil(remainingTime)} seconds remaining`;
-
-                            if (response.complete) {
-                                this.downloadLink = response.downloadLink;
-                                this.showDownloadSection = true;
-                                break;
-                            }
-                        } catch (error) {
-                            console.error('Upload error:', error);
-                            alert('Upload failed: ' + error.message);
-                            break;
+                    }
+                },
+                updateUploadStats(bytesUploaded) {
+                    const now = Date.now();
+                    const bytesActual = Math.min(bytesUploaded, this.uploadStats.totalBytes);
+                    this.uploadStats.uploadedBytes = bytesActual;
+                    
+                    // Calculate time elapsed in seconds
+                    const timeElapsed = (now - this.uploadStats.startTime) / 1000;
+                    
+                    if (timeElapsed > 0) {
+                        // Calculate upload speed (bytes per second)
+                        const bps = bytesActual / timeElapsed;
+                        this.uploadSpeed = this.formatSpeed(bps);
+                        
+                        // Calculate time remaining
+                        const remainingBytes = this.uploadStats.totalBytes - bytesActual;
+                        if (bps > 0) {
+                            const secondsRemaining = Math.ceil(remainingBytes / bps);
+                            this.timeRemaining = this.formatTimeRemaining(secondsRemaining);
                         }
                     }
-
-                    this.uploading = false;
+                },
+                formatSpeed(bytesPerSecond) {
+                    if (bytesPerSecond < 1024) {
+                        return `${bytesPerSecond.toFixed(1)} B/s`;
+                    } else if (bytesPerSecond < 1024 * 1024) {
+                        return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+                    } else {
+                        return `${(bytesPerSecond / 1024 / 1024).toFixed(2)} MB/s`;
+                    }
+                },
+                formatTimeRemaining(seconds) {
+                    if (seconds < 60) {
+                        return `${seconds} seconds remaining`;
+                    } else if (seconds < 3600) {
+                        return `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds remaining`;
+                    } else {
+                        return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes remaining`;
+                    }
+                },
+                formatFileSize(bytes) {
+                    if (bytes < 1024) {
+                        return bytes + ' bytes';
+                    } else if (bytes < 1024 * 1024) {
+                        return (bytes / 1024).toFixed(1) + ' KB';
+                    } else if (bytes < 1024 * 1024 * 1024) {
+                        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+                    } else {
+                        return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+                    }
                 },
                 copyDownloadLink() {
-                    const copyText = this.$refs.downloadInput;
-                    const copyBtn = event.target;
-                    const originalText = copyBtn.innerHTML;
+                    this.$refs.downloadInput.select();
+                    document.execCommand('copy');
                     
-                    copyText.select();
-                    navigator.clipboard.writeText(copyText.value);
-                    
-                    // Update button text and style
-                    copyBtn.innerHTML = `
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span>Copied</span>
-                        </div>
-                    `;
-                    copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-                    
-                    // Reset button after 1 second
+                    // Show copy feedback
+                    const originalText = event.target.innerText;
+                    event.target.innerText = 'Copied!';
                     setTimeout(() => {
-                        copyBtn.innerHTML = originalText;
-                        copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                        copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    }, 1000);
-                },
-                formatFileSize(size) {
-                    if (size < 1024) return `${size} bytes`;
-                    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-                    if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(2)} MB`;
-                    return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`;
+                        event.target.innerText = originalText;
+                    }, 2000);
                 }
             }
         }).mount('#app')
+
+        // Configure NProgress
+        NProgress.configure({ 
+            showSpinner: false,
+            minimum: 0.08,
+            easing: 'ease',
+            speed: 500 
+        });
     </script>
 </body>
 </html>
-<!-- Add this CSS for better mobile responsiveness -->
-<style>
-@media (max-width: 576px) {
-    .input-group {
-        flex-direction: column;
-    }
-    .input-group .form-control {
-        border-radius: .25rem !important;
-        margin-bottom: 10px;
-    }
-    .input-group .btn {
-        border-radius: .25rem !important;
-        width: 100%;
-    }
-}
-</style>
