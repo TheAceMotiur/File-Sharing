@@ -7,15 +7,13 @@ jobs:
     steps:
     - name: 🚚 Get latest code
       uses: actions/checkout@v4
-      
-    - name: 📂 Install LFTP
-      run: sudo apt-get install -y lftp
-      
-    - name: 🔑 Create LFTP script
-      run: |
-        echo "set ssl:verify-certificate no;" > lftp_script
-        echo "open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} ${{ secrets.FTP_SERVER }}" >> lftp_script
-        echo "mirror -R --delete --verbose ./ /" >> lftp_script
-      
-    - name: 🚀 Execute LFTP script
-      run: lftp -f lftp_script
+    
+    - name: 📂 Deploy with rsync
+      uses: Burnett01/rsync-deployments@6.0.0
+      with:
+        switches: -avzr --delete
+        path: ./
+        remote_path: /home/fileswith/htdocs/fileswith.com/
+        remote_host: ${{ secrets.FTP_SERVER }}
+        remote_user: ${{ secrets.FTP_USERNAME }}
+        remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
