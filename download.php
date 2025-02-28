@@ -57,7 +57,7 @@ function incrementDownloadCount($fileId) {
 // Function to add watermark to file name
 function addWatermark($fileName) {
     $info = pathinfo($fileName);
-    return $info['filename'] . '-[FreeNetly.COM].' . $info['extension'];
+    return $info['filename'] . '-[FILESWITH.COM].' . $info['extension'];
 }
 
 function isImageFile($fileName) {
@@ -243,8 +243,8 @@ function safeGetMimeType($fileName) {
     
     <?php
     // Generate SEO-friendly title and description
-    $pageTitle = "Download " . $fileName . " - FreeNetly Secure File Sharing";
-    $pageDescription = "Download " . $fileName . " securely via FreeNetly. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
+    $pageTitle = "Download " . $fileName . " - FilesWith Secure File Sharing";
+    $pageDescription = "Download " . $fileName . " securely via FilesWith. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
     $canonicalUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
     
     // Determine if file is an image and set preview URL
@@ -259,7 +259,7 @@ function safeGetMimeType($fileName) {
     <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl); ?>">
     <meta name="robots" content="noindex, nofollow, max-image-preview:large">
     <meta name="language" content="English">
-    <meta name="author" content="FreeNetly">
+    <meta name="author" content="FilesWith">
     <meta name="theme-color" content="#2563eb">
 
     <!-- Open Graph / Facebook -->
@@ -274,7 +274,7 @@ function safeGetMimeType($fileName) {
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Preview of <?php echo htmlspecialchars($fileName); ?>">
     <?php endif; ?>
-    <meta property="og:site_name" content="FreeNetly">
+    <meta property="og:site_name" content="FilesWith">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="<?php echo $isImage ? 'summary_large_image' : 'summary'; ?>">
@@ -290,8 +290,8 @@ function safeGetMimeType($fileName) {
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="FreeNetly">
-    <meta name="apple-mobile-web-app-title" content="FreeNetly">
+    <meta name="application-name" content="FilesWith">
+    <meta name="apple-mobile-web-app-title" content="FilesWith">
 
     <!-- JSON-LD Structured Data with more details -->
     <script type="application/ld+json">
@@ -309,7 +309,7 @@ function safeGetMimeType($fileName) {
         },
         "publisher": {
             "@type": "Organization",
-            "name": "FreeNetly",
+            "name": "FilesWith",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -323,7 +323,7 @@ function safeGetMimeType($fileName) {
         "itemListElement": [{
             "@type": "ListItem",
             "position": 1,
-            "name": "FreeNetly",
+            "name": "FilesWith",
             "item": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         },
         {
@@ -416,7 +416,7 @@ function safeGetMimeType($fileName) {
                 
                     <!-- Download Button -->
                     <div class="flex justify-center">
-                        <a href="https://freenetly.com/wait.php?link=https://freenetly.com/download/<?php echo urlencode($fileId); ?>/download"
+                        <a href="https://fileswith.com/wait.php?link=https://fileswith.com/download/<?php echo urlencode($fileId); ?>/download"
                            class="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
                             <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -501,7 +501,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- Twitter/X -->
-                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FreeNetly'); ?>" 
+                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-gray-800 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -517,7 +517,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- WhatsApp -->
-                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via FreeNetly: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
+                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -525,7 +525,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- Telegram -->
-                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FreeNetly'); ?>" 
+                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">

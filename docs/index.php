@@ -8,7 +8,7 @@ require_once __DIR__ . '/../config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Documentation - FreeNetly</title>
+    <title>API Documentation - FilesWith</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -19,7 +19,7 @@ require_once __DIR__ . '/../config.php';
             <!-- Introduction -->
             <div class="mb-12">
                 <h1 class="text-3xl font-bold text-gray-900 mb-4">API Documentation</h1>
-                <p class="text-lg text-gray-600">Welcome to the FreeNetly API documentation. Here's how to use our endpoints.</p>
+                <p class="text-lg text-gray-600">Welcome to the FilesWith API documentation. Here's how to use our endpoints.</p>
             </div>
 
             <!-- Upload Section -->
@@ -38,7 +38,7 @@ Content-Type: multipart/form-data</pre>
                         <pre class="bg-gray-800 text-gray-100 rounded-md p-4 text-sm">
 {
     "success": true,
-    "downloadLink": "https://freenetly.com/download.php?id=unique_id"
+    "downloadLink": "https://fileswith.com/download.php?id=unique_id"
 }</pre>
                     </div>
                 </div>
@@ -144,7 +144,7 @@ Content-Type: multipart/form-data</pre>
                     <h3 class="text-lg font-medium text-gray-900 mb-2">PHP Example</h3>
                     <pre class="bg-gray-800 text-gray-100 rounded-md p-4 text-sm overflow-x-auto">
 // Upload file
-$ch = curl_init("https://freenetly.com/api/?action=upload");
+$ch = curl_init("https://fileswith.com/api/?action=upload");
 $file = new CURLFile("/path/to/file.pdf", "application/pdf", "file.pdf");
 
 curl_setopt($ch, CURLOPT_POST, true);
@@ -184,7 +184,7 @@ const uploadFile = async (file) => {
                     <h3 class="text-lg font-medium text-gray-900 mb-2">Login Example</h3>
                     <pre class="bg-gray-800 text-gray-100 rounded-md p-4 text-sm overflow-x-auto">
 // PHP Login Example
-$ch = curl_init("https://freenetly.com/api/?action=login");
+$ch = curl_init("https://fileswith.com/api/?action=login");
 $data = [
     'email' => 'user@example.com',
     'password' => 'your_password'

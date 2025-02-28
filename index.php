@@ -306,25 +306,25 @@ ob_end_flush();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- Primary Meta Tags -->
-    <title>FreeNetly - Fast & Secure File Sharing Platform</title>
-    <meta name="title" content="FreeNetly - Fast & Secure File Sharing Platform">
-    <meta name="description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <title>FilesWith - Fast & Secure File Sharing Platform</title>
+    <meta name="title" content="FilesWith - Fast & Secure File Sharing Platform">
+    <meta name="description" content="Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta name="robots" content="index, follow">
     <meta name="language" content="English">
-    <meta name="author" content="FreeNetly">
+    <meta name="author" content="FilesWith">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="og:title" content="FreeNetly - Fast & Secure File Sharing Platform">
-    <meta property="og:description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="og:title" content="FilesWith - Fast & Secure File Sharing Platform">
+    <meta property="og:description" content="Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="og:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="twitter:title" content="FreeNetly - Fast & Secure File Sharing Platform">
-    <meta property="twitter:description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="twitter:title" content="FilesWith - Fast & Secure File Sharing Platform">
+    <meta property="twitter:description" content="Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="twitter:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Canonical URL -->
@@ -335,8 +335,8 @@ ob_end_flush();
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "FreeNetly",
-        "description": "Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
+        "name": "FilesWith",
+        "description": "Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
         "offers": {
@@ -358,7 +358,7 @@ ob_end_flush();
         },
         "creator": {
             "@type": "Organization",
-            "name": "FreeNetly",
+            "name": "FilesWith",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -393,8 +393,8 @@ ob_end_flush();
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "FreeNetly",
-        "description": "Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
+        "name": "FilesWith",
+        "description": "Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
         "offers": {

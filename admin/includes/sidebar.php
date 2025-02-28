@@ -25,7 +25,7 @@ try {
     :class="{'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen}"
     class="fixed inset-y-0 left-0 w-64 bg-gray-800 transform transition-transform duration-200 ease-in-out lg:translate-x-0 z-20">
     <div class="flex items-center justify-between h-16 bg-gray-900 px-4">
-        <a href="/dashboard" class="text-white text-xl font-bold">FreeNetly Admin</a>
+        <a href="/dashboard" class="text-white text-xl font-bold">FilesWith Admin</a>
         <!-- Mobile Close Button -->
         <button @click="sidebarOpen = false" class="lg:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700">
             <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">

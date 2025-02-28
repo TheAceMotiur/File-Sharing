@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /cron/
-Sitemap: https://freenetly.com/sitemap.xml
+Sitemap: https://fileswith.com/sitemap.xml

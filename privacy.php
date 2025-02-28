@@ -7,7 +7,7 @@ session_start();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - FreeNetly</title>
+    <title>Privacy Policy - FilesWith</title>
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -98,7 +98,7 @@ session_start();
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">7. Contact Us</h2>
                 <p class="text-gray-600">If you have any questions about this Privacy Policy, please contact us at:</p>
-                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@freenetly.com'); ?></p>
+                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@fileswith.com'); ?></p>
             </section>
         </div>
 
