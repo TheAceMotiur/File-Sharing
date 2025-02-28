@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'path' => $params['path'],
                             'domain' => $params['domain'],
                             'httponly' => true,
-                            'secure' => false,
+                            'secure' => isset($_SERVER['HTTPS']),
                             'samesite' => 'Lax'
                         ]);
 

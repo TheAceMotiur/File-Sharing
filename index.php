@@ -164,7 +164,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         
         // Check if we have all chunks
         $uniqueChunks = array_unique($metaData['uploadedChunks']);
+        sort($uniqueChunks); // Sort to ensure sequential check
         $isComplete = count($uniqueChunks) === $totalChunks;
+        
+        // Additional verification - check if the array has all sequential chunks
+        if ($isComplete) {
+            $isSequential = true;
+            for ($i = 0; $i < $totalChunks; $i++) {
+                if (!in_array($i, $uniqueChunks)) {
+                    $isSequential = false;
+                    $isComplete = false;
+                    break;
+                }
+            }
+            
+            if (!$isSequential) {
+                error_log("Missing chunks detected in upload $tempId");
+            }
+        }
         
         if ($isComplete) {
             // All chunks received, combine them into a single file
@@ -207,85 +224,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
                 throw new Exception("File size mismatch: expected $fileSize bytes, got $actualSize bytes");
             }
             
-            // Get Dropbox credentials with available storage
-            $db = getDBConnection();
-            $dropbox = $db->query("
-                SELECT da.*, 
-                       COALESCE(SUM(fu.size), 0) as used_storage
-                FROM dropbox_accounts da
-                LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
-                    AND fu.upload_status = 'completed'
-                GROUP BY da.id
-                HAVING used_storage < 2147483648 OR used_storage IS NULL
-                LIMIT 1
-            ")->fetch_assoc();
+            try {
+                // Get Dropbox credentials with available storage
+                $db = getDBConnection();
+                $dropbox = $db->query("
+                    SELECT da.*, 
+                           COALESCE(SUM(fu.size), 0) as used_storage
+                    FROM dropbox_accounts da
+                    LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
+                        AND fu.upload_status = 'completed'
+                    GROUP BY da.id
+                    HAVING used_storage < 2147483648 OR used_storage IS NULL
+                    LIMIT 1
+                ")->fetch_assoc();
 
-            if (!$dropbox) {
-                throw new Exception('No Dropbox account with available storage');
-            }
-
-            // Initialize Dropbox client with the selected account
-            $client = new Spatie\Dropbox\Client($dropbox['access_token']);
-            
-            // Generate unique file ID
-            $fileId = uniqid();
-            
-            // Upload to Dropbox with retry logic
-            $dropboxPath = "/{$fileId}/{$fileName}";
-            $uploaded = false;
-            $uploadRetries = 0;
-            $maxUploadRetries = 3;
-            
-            while (!$uploaded && $uploadRetries < $maxUploadRetries) {
-                try {
-                    $client->upload($dropboxPath, fopen($completePath, 'r'), 'add');
-                    $uploaded = true;
-                } catch (Exception $e) {
-                    $uploadRetries++;
-                    if ($uploadRetries >= $maxUploadRetries) {
-                        throw new Exception('Failed to upload to Dropbox after multiple attempts: ' . $e->getMessage());
-                    }
-                    sleep(2); // Wait before retrying
+                if (!$dropbox) {
+                    throw new Exception('No Dropbox account with available storage');
                 }
-            }
-            
-            // Save file info to database with the selected Dropbox account
-            $stmt = $db->prepare("INSERT INTO file_uploads (
-                file_id, 
-                file_name, 
-                size, 
-                upload_status, 
-                dropbox_path, 
-                dropbox_account_id, 
-                uploaded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            
-            $status = 'completed';
-            $stmt->bind_param("ssissii", 
-                $fileId,
-                $fileName,
-                $fileSize,
-                $status,
-                $dropboxPath,
-                $dropbox['id'],
-                $_SESSION['user_id']
-            );
-            
-            if (!$stmt->execute()) {
-                throw new Exception('Failed to save file data to database: ' . $stmt->error);
-            }
 
-            // Clean up the temporary files
-            cleanupTempFiles($uploadDir);
+                // Initialize Dropbox client with the selected account
+                $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+                
+                // Generate unique file ID
+                $fileId = uniqid();
+                
+                // Upload to Dropbox with retry logic
+                $dropboxPath = "/{$fileId}/{$fileName}";
+                $uploaded = false;
+                $uploadRetries = 0;
+                $maxUploadRetries = 3;
+                
+                while (!$uploaded && $uploadRetries < $maxUploadRetries) {
+                    try {
+                        $client->upload($dropboxPath, fopen($completePath, 'r'), 'add');
+                        $uploaded = true;
+                    } catch (Exception $e) {
+                        $uploadRetries++;
+                        error_log("Dropbox upload attempt $uploadRetries failed: " . $e->getMessage());
+                        
+                        if ($uploadRetries >= $maxUploadRetries) {
+                            throw new Exception('Failed to upload to Dropbox after multiple attempts: ' . $e->getMessage());
+                        }
+                        sleep(2); // Wait before retrying
+                    }
+                }
+                
+                // Save file info to database with the selected Dropbox account
+                $stmt = $db->prepare("INSERT INTO file_uploads (
+                    file_id, 
+                    file_name, 
+                    size, 
+                    upload_status, 
+                    dropbox_path, 
+                    dropbox_account_id, 
+                    uploaded_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                
+                $status = 'completed';
+                $stmt->bind_param("ssissii", 
+                    $fileId,
+                    $fileName,
+                    $fileSize,
+                    $status,
+                    $dropboxPath,
+                    $dropbox['id'],
+                    $_SESSION['user_id']
+                );
+                
+                if (!$stmt->execute()) {
+                    throw new Exception('Failed to save file data to database: ' . $stmt->error);
+                }
 
-            $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
-            
-            echo json_encode([
-                'success' => true,
-                'downloadLink' => $downloadLink,
-                'complete' => true,
-                'fileId' => $fileId
-            ]);
+                // Clean up the temporary files
+                cleanupTempFiles($uploadDir);
+
+                $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
+                
+                echo json_encode([
+                    'success' => true,
+                    'downloadLink' => $downloadLink,
+                    'complete' => true,
+                    'fileId' => $fileId
+                ]);
+            } catch (Exception $e) {
+                error_log("Error in final upload processing: " . $e->getMessage());
+                throw $e;
+            }
         } else {
             // Return success for this chunk with progress info
             $progress = [
@@ -348,7 +372,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         
         // Check if all chunks are present
         $uniqueChunks = array_unique($metaData['uploadedChunks']);
+        sort($uniqueChunks); // Sort to ensure sequential check
         $isComplete = count($uniqueChunks) === $metaData['totalChunks'];
+        
+        // Additional verification - check if the array has all sequential chunks
+        if ($isComplete) {
+            for ($i = 0; $i < $metaData['totalChunks']; $i++) {
+                if (!in_array($i, $uniqueChunks)) {
+                    $isComplete = false;
+                    break;
+                }
+            }
+        }
         
         echo json_encode([
             'success' => true,
