@@ -4,7 +4,166 @@ session_start();
 require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Handle chunk upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_chunk') {
+    // Check if user is logged in
+    if (!isset($_SESSION['user_id'])) {
+        header('Content-Type: application/json');
+        http_response_code(401);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Login required to upload files'
+        ]);
+        exit;
+    }
+
+    header('Content-Type: application/json');
+    try {
+        // Get chunk data and metadata
+        $chunkData = file_get_contents('php://input');
+        $chunkNum = isset($_GET['chunk']) ? (int)$_GET['chunk'] : 0;
+        $totalChunks = isset($_GET['chunks']) ? (int)$_GET['chunks'] : 0;
+        $fileName = isset($_GET['name']) ? $_GET['name'] : '';
+        $fileSize = isset($_GET['size']) ? (int)$_GET['size'] : 0;
+        $fileType = isset($_GET['type']) ? $_GET['type'] : '';
+        $tempId = isset($_GET['temp_id']) ? $_GET['temp_id'] : uniqid();
+        
+        if (empty($fileName) || $totalChunks <= 0) {
+            throw new Exception('Invalid chunk upload request');
+        }
+        
+        // Validate file type
+        $allowedTypes = [
+            // Images
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+            // Audio
+            'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
+            // Video
+            'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
+            // Archives
+            'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+            'application/x-tar', 'application/gzip',
+            // Documents
+            'application/pdf', 'image/vnd.djvu',
+            // Other media
+            'application/vnd.apple.mpegurl', 'application/x-mpegurl'
+        ];
+
+        if (!in_array($fileType, $allowedTypes)) {
+            throw new Exception('File type not allowed. Only media and archive files are supported.');
+        }
+
+        // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
+        if ($fileSize > 2 * 1024 * 1024 * 1024) {
+            throw new Exception('File size exceeds 2 GB limit');
+        }
+
+        // Create temp directory if it doesn't exist
+        $tempDir = __DIR__ . '/temp';
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+        
+        // Save chunk to temporary file
+        $chunkPath = $tempDir . '/' . $tempId . '_' . $chunkNum;
+        file_put_contents($chunkPath, $chunkData);
+        
+        // If this is the last chunk, combine all chunks and process the complete file
+        if ($chunkNum === $totalChunks - 1) {
+            // Combine chunks into a single file
+            $completePath = $tempDir . '/' . $tempId . '_complete';
+            $completeFile = fopen($completePath, 'wb');
+            
+            for ($i = 0; $i < $totalChunks; $i++) {
+                $chunkPath = $tempDir . '/' . $tempId . '_' . $i;
+                $chunk = file_get_contents($chunkPath);
+                fwrite($completeFile, $chunk);
+                unlink($chunkPath); // Delete chunk after combining
+            }
+            fclose($completeFile);
+            
+            // Get Dropbox credentials with available storage
+            $db = getDBConnection();
+            $dropbox = $db->query("
+                SELECT da.*, 
+                       COALESCE(SUM(fu.size), 0) as used_storage
+                FROM dropbox_accounts da
+                LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
+                    AND fu.upload_status = 'completed'
+                GROUP BY da.id
+                HAVING used_storage < 2147483648 OR used_storage IS NULL
+                LIMIT 1
+            ")->fetch_assoc();
+
+            if (!$dropbox) {
+                throw new Exception('No Dropbox account with available storage');
+            }
+
+            // Initialize Dropbox client with the selected account
+            $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+            
+            // Generate unique file ID
+            $fileId = uniqid();
+            
+            // Upload to Dropbox
+            $dropboxPath = "/{$fileId}/{$fileName}";
+            $client->upload($dropboxPath, fopen($completePath, 'r'), 'add');
+            
+            // Save file info to database with the selected Dropbox account
+            $stmt = $db->prepare("INSERT INTO file_uploads (
+                file_id, 
+                file_name, 
+                size, 
+                upload_status, 
+                dropbox_path, 
+                dropbox_account_id, 
+                uploaded_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            
+            $status = 'completed';
+            $stmt->bind_param("ssissii", 
+                $fileId,
+                $fileName,
+                $fileSize,
+                $status,
+                $dropboxPath,
+                $dropbox['id'],
+                $_SESSION['user_id']
+            );
+            $stmt->execute();
+
+            // Delete the complete file
+            unlink($completePath);
+
+            $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
+            
+            echo json_encode([
+                'success' => true,
+                'downloadLink' => $downloadLink,
+                'complete' => true
+            ]);
+        } else {
+            // Return success for this chunk
+            echo json_encode([
+                'success' => true,
+                'chunk' => $chunkNum,
+                'temp_id' => $tempId,
+                'complete' => false
+            ]);
+        }
+        exit;
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// Original file upload handler for smaller files
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
@@ -53,9 +212,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('File type not allowed. Only media and archive files are supported.');
         }
 
-        // Add size validation (100MB = 100 * 1024 * 1024 bytes)
-        if ($file['size'] > 100 * 1024 * 1024) {
-            throw new Exception('File size exceeds 100 MB limit');
+        // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
+        if ($file['size'] > 2 * 1024 * 1024 * 1024) {
+            throw new Exception('File size exceeds 2 GB limit');
         }
 
         // Get Dropbox credentials with available storage
@@ -299,7 +458,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>
                                     <p class="mt-2 text-gray-600">Drag and drop or click to select</p>
                                     <div class="mt-2 text-sm text-gray-500">
-                                        Maximum file size: 100 MB<br>
+                                        Maximum file size: 2 GB<br>
                                         Supported formats: Images, Audio, Video, Archives
                                     </div>
                                     <input type="file" class="hidden" @change="handleFileSelect" ref="fileInput" required>
@@ -310,6 +469,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
 
                                 <div v-else class="space-y-4">
+                                    <div class="text-center mb-2" v-if="isLargeFile">
+                                        <p class="text-sm font-medium text-gray-700">
+                                            Uploading large file ({{ formatFileSize(fileSize) }})
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            Chunk {{ currentChunk + 1 }} of {{ totalChunks }}
+                                        </p>
+                                    </div>
                                     <div class="w-full bg-gray-200 rounded-full h-3">
                                         <div class="bg-blue-600 h-3 rounded-full transition-all duration-150" 
                                              :style="{ width: progress + '%' }">
@@ -317,6 +484,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </div>
                                     <p class="text-sm font-medium text-gray-600">
                                         Uploading... {{ progress }}%
+                                    </p>
+                                    <p class="text-xs text-gray-500" v-if="uploadSpeed">
+                                        {{ uploadSpeed }} | {{ timeRemaining }}
                                     </p>
                                 </div>
                             </div>
@@ -480,7 +650,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     uploading: false,
                     progress: 0,
                     downloadLink: '',
-                    showDownloadSection: false
+                    showDownloadSection: false,
+                    isLargeFile: false,
+                    fileSize: 0,
+                    currentChunk: 0,
+                    totalChunks: 0,
+                    uploadSpeed: '',
+                    timeRemaining: ''
                 }
             },
             methods: {
@@ -520,15 +696,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 },
                 async uploadFile(file) {
                     // Add size check at the start
-                    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                    const maxSize = 2 * 1024 * 1024 * 1024; // 2GB in bytes
                     if (file.size > maxSize) {
-                        alert('File is too large. Maximum file size is 100 MB.');
+                        alert('File is too large. Maximum file size is 2 GB.');
                         return;
                     }
 
                     this.uploading = true;
                     this.progress = 0;
+                    this.isLargeFile = file.size > 100 * 1024 * 1024; // Consider large if > 100MB
+                    this.fileSize = file.size;
                     
+                    if (this.isLargeFile) {
+                        await this.uploadLargeFile(file);
+                    } else {
+                        await this.uploadSmallFile(file);
+                    }
+                },
+                async uploadSmallFile(file) {
                     const formData = new FormData();
                     formData.append('file', file);
 
@@ -581,6 +766,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         NProgress.done();
                     }
                 },
+                async uploadLargeFile(file) {
+                    const chunkSize = 10 * 1024 * 1024; // 10MB per chunk
+                    this.totalChunks = Math.ceil(file.size / chunkSize);
+                    this.currentChunk = 0;
+                    const tempId = Date.now().toString();
+                    let startTime = Date.now();
+
+                    for (let i = 0; i < this.totalChunks; i++) {
+                        const start = i * chunkSize;
+                        const end = Math.min(start + chunkSize, file.size);
+                        const chunk = file.slice(start, end);
+
+                        const formData = new FormData();
+                        formData.append('action', 'upload_chunk');
+                        formData.append('chunk', i);
+                        formData.append('chunks', this.totalChunks);
+                        formData.append('name', file.name);
+                        formData.append('size', file.size);
+                        formData.append('type', file.type);
+                        formData.append('temp_id', tempId);
+
+                        try {
+                            const xhr = new XMLHttpRequest();
+                            const uploadPromise = new Promise((resolve, reject) => {
+                                xhr.onload = () => {
+                                    if (xhr.status >= 200 && xhr.status < 300) {
+                                        try {
+                                            const response = JSON.parse(xhr.responseText);
+                                            resolve(response);
+                                        } catch (e) {
+                                            reject(new Error('Invalid JSON response'));
+                                        }
+                                    } else {
+                                        reject(new Error('Upload failed'));
+                                    }
+                                };
+                                xhr.onerror = () => reject(new Error('Network error'));
+                            });
+
+                            xhr.open('POST', `index.php?action=upload_chunk&chunk=${i}&chunks=${this.totalChunks}&name=${encodeURIComponent(file.name)}&size=${file.size}&type=${file.type}&temp_id=${tempId}`, true);
+                            xhr.send(chunk);
+
+                            const response = await uploadPromise;
+
+                            if (!response.success) {
+                                throw new Error(response.error || 'Upload failed');
+                            }
+
+                            this.currentChunk = i + 1;
+                            this.progress = Math.round((this.currentChunk * 100) / this.totalChunks);
+
+                            // Calculate upload speed and time remaining
+                            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+                            const uploadedSize = (i + 1) * chunkSize;
+                            const speed = uploadedSize / elapsedTime; // bytes per second
+                            this.uploadSpeed = `${(speed / 1024 / 1024).toFixed(2)} MB/s`;
+                            const remainingSize = file.size - uploadedSize;
+                            const remainingTime = remainingSize / speed; // in seconds
+                            this.timeRemaining = `${Math.ceil(remainingTime)} seconds remaining`;
+
+                            if (response.complete) {
+                                this.downloadLink = response.downloadLink;
+                                this.showDownloadSection = true;
+                                break;
+                            }
+                        } catch (error) {
+                            console.error('Upload error:', error);
+                            alert('Upload failed: ' + error.message);
+                            break;
+                        }
+                    }
+
+                    this.uploading = false;
+                },
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
@@ -607,6 +866,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
                         copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
                     }, 1000);
+                },
+                formatFileSize(size) {
+                    if (size < 1024) return `${size} bytes`;
+                    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+                    if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(2)} MB`;
+                    return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`;
                 }
             }
         }).mount('#app')
