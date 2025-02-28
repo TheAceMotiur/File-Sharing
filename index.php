@@ -400,6 +400,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
         if (!isset($_FILES['file'])) {
             throw new Exception('No file uploaded');
         }
+        
+        // Correctly access the uploaded file
+        $file = $_FILES['file'];
 
         // Add allowed file types
         $allowedTypes = [
@@ -420,7 +423,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
 
         // Get file mime type
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        $mimeType = finfo_file($finfo, $_FILES['file']['tmp_name']);
         finfo_close($finfo);
 
         if (!in_array($mimeType, $allowedTypes)) {
@@ -428,7 +431,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
         }
 
         // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
-        if ($file['size'] > 2 * 1024 * 1024 * 1024) {
+        if ($_FILES['file']['size'] > 2 * 1024 * 1024 * 1024) {
             throw new Exception('File size exceeds 2 GB limit');
         }
 
@@ -450,14 +453,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
         }
 
         // Initialize Dropbox client with the selected account
-        $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+        $client = new DropboxClient($dropbox['access_token']);
         
         // Generate unique file ID
         $fileId = uniqid();
         
         // Upload to Dropbox
-        $dropboxPath = "/{$fileId}/{$file['name']}";
-        $fileContents = file_get_contents($file['tmp_name']);
+        $dropboxPath = "/{$fileId}/{$_FILES['file']['name']}";
+        $fileContents = file_get_contents($_FILES['file']['tmp_name']);
         $client->upload($dropboxPath, $fileContents, 'add');
         
         // Save file info to database with the selected Dropbox account
@@ -474,8 +477,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
         $status = 'completed';
         $stmt->bind_param("ssissii", 
             $fileId,
-            $file['name'],
-            $file['size'],
+            $_FILES['file']['name'],
+            $_FILES['file']['size'],
             $status,
             $dropboxPath,
             $dropbox['id'],
@@ -492,6 +495,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset(
         exit;
 
     } catch (Exception $e) {
+        error_log("Upload error: " . $e->getMessage());
         http_response_code(400);
         echo json_encode([
             'success' => false,
@@ -748,7 +752,7 @@ ob_end_flush();
                                         class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                     </svg>
                                     Copy Link
                                 </button>
