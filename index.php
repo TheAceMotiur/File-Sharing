@@ -650,85 +650,97 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                     this.showDownloadSection = true;
                 },
                 async chunkedUpload(file) {
-                    // Generate a unique ID for this file upload session
-                    const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-                    
-                    // Calculate total chunks
-                    const totalChunks = Math.ceil(file.size / this.chunkSize);
-                    let uploadedChunks = 0;
-                    let totalUploaded = 0;
-                    
-                    // Create a directory for chunks
-                    await fetch('chunk_upload.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            action: 'init',
-                            fileId: fileId,
-                            fileName: file.name,
-                            totalChunks: totalChunks,
-                            fileSize: file.size
-                        })
-                    });
-                    
-                    // Upload each chunk
-                    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                        const start = chunkIndex * this.chunkSize;
-                        const end = Math.min(file.size, start + this.chunkSize);
-                        const chunk = file.slice(start, end);
+                    try {
+                        // Generate a unique ID for this file upload session
+                        const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
                         
-                        this.chunkStats = {
-                            current: chunkIndex + 1,
-                            total: totalChunks
-                        };
+                        // Calculate total chunks
+                        const totalChunks = Math.ceil(file.size / this.chunkSize);
+                        let uploadedChunks = 0;
+                        let totalUploaded = 0;
                         
-                        const formData = new FormData();
-                        formData.append('chunk', chunk);
-                        formData.append('fileId', fileId);
-                        formData.append('chunkIndex', chunkIndex);
-                        formData.append('fileName', file.name);
-                        formData.append('totalChunks', totalChunks);
-                        
-                        const response = await fetch('chunk_upload.php', {
+                        // Create a directory for chunks
+                        const initResponse = await fetch('chunk_upload.php', {
                             method: 'POST',
-                            body: formData
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                action: 'init',
+                                fileId: fileId,
+                                fileName: file.name,
+                                totalChunks: totalChunks,
+                                fileSize: file.size
+                            })
                         });
                         
-                        if (!response.ok) {
-                            throw new Error(`Failed to upload chunk ${chunkIndex + 1}`);
+                        if (!initResponse.ok) {
+                            const errorData = await initResponse.json();
+                            throw new Error(errorData.error || 'Failed to initialize upload');
                         }
                         
-                        uploadedChunks++;
-                        totalUploaded += chunk.size;
-                        this.progress = Math.round((totalUploaded * 100) / file.size);
+                        // Upload each chunk
+                        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                            const start = chunkIndex * this.chunkSize;
+                            const end = Math.min(file.size, start + this.chunkSize);
+                            const chunk = file.slice(start, end);
+                            
+                            this.chunkStats = {
+                                current: chunkIndex + 1,
+                                total: totalChunks
+                            };
+                            
+                            const formData = new FormData();
+                            formData.append('chunk', chunk);
+                            formData.append('fileId', fileId);
+                            formData.append('chunkIndex', chunkIndex);
+                            formData.append('fileName', file.name);
+                            formData.append('totalChunks', totalChunks);
+                            
+                            const chunkResponse = await fetch('chunk_upload.php', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (!chunkResponse.ok) {
+                                const errorData = await chunkResponse.json();
+                                throw new Error(errorData.error || `Failed to upload chunk ${chunkIndex + 1}`);
+                            }
+                            
+                            uploadedChunks++;
+                            totalUploaded += chunk.size;
+                            this.progress = Math.round((totalUploaded * 100) / file.size);
+                        }
+                        
+                        // All chunks uploaded, now finalize
+                        const finalFormData = new FormData();
+                        finalFormData.append('fileId', fileId);
+                        finalFormData.append('fileName', file.name);
+                        finalFormData.append('totalSize', file.size);
+                        finalFormData.append('chunksComplete', 'true');
+                        
+                        const finalResponse = await fetch('index.php', {
+                            method: 'POST',
+                            body: finalFormData
+                        });
+                        
+                        if (!finalResponse.ok) {
+                            const errorData = await finalResponse.json();
+                            throw new Error(errorData.error || 'Failed to finalize upload');
+                        }
+                        
+                        const result = await finalResponse.json();
+                        
+                        if (!result.success) {
+                            throw new Error(result.error || 'Upload failed');
+                        }
+                        
+                        this.downloadLink = result.downloadLink;
+                        this.showDownloadSection = true;
+                    } catch (error) {
+                        console.error('Chunked upload error:', error);
+                        throw error;
                     }
-                    
-                    // All chunks uploaded, now finalize
-                    const finalFormData = new FormData();
-                    finalFormData.append('fileId', fileId);
-                    finalFormData.append('fileName', file.name);
-                    finalFormData.append('totalSize', file.size);
-                    finalFormData.append('chunksComplete', 'true');
-                    
-                    const finalResponse = await fetch('index.php', {
-                        method: 'POST',
-                        body: finalFormData
-                    });
-                    
-                    if (!finalResponse.ok) {
-                        throw new Error('Failed to finalize upload');
-                    }
-                    
-                    const result = await finalResponse.json();
-                    
-                    if (!result.success) {
-                        throw new Error(result.error || 'Upload failed');
-                    }
-                    
-                    this.downloadLink = result.downloadLink;
-                    this.showDownloadSection = true;
                 },
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
