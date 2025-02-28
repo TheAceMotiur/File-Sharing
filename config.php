@@ -25,9 +25,9 @@ function getDBConnection() {
     static $db = null;
     
     if ($db === null) {
-        $host = '37.211.159.106';
-        $dbname = 'onenetly_home';
-        $username = 'onenetly_home';
+        $host = 'localhost';
+        $dbname = 'TheAceMotiur_fileswith';
+        $username = 'TheAceMotiur_fileswith';
         $password = 'AmiMotiur27@';
 
         try {
