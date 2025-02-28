@@ -12,7 +12,6 @@ jobs:
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: 192.64.115.250
-        username: fileswith-ftp
+        username: TheAceMotiur_fileswith
         password: AmiMotiur27@
-        server-dir: /
-        protocol: ftp
+        server-dir: /home/TheAceMotiur_fileswith/public_html/
