@@ -134,25 +134,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- Primary Meta Tags -->
-    <title>OneNetly - Fast & Secure File Sharing Platform</title>
-    <meta name="title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta name="description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <title>FreeNetly - Fast & Secure File Sharing Platform</title>
+    <meta name="title" content="FreeNetly - Fast & Secure File Sharing Platform">
+    <meta name="description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta name="robots" content="index, follow">
     <meta name="language" content="English">
-    <meta name="author" content="OneNetly">
+    <meta name="author" content="FreeNetly">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="og:title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta property="og:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="og:title" content="FreeNetly - Fast & Secure File Sharing Platform">
+    <meta property="og:description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="og:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="twitter:title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta property="twitter:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="twitter:title" content="FreeNetly - Fast & Secure File Sharing Platform">
+    <meta property="twitter:description" content="Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="twitter:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Canonical URL -->
@@ -163,8 +163,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "OneNetly",
-        "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
+        "name": "FreeNetly",
+        "description": "Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
         "offers": {
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         },
         "creator": {
             "@type": "Organization",
-            "name": "OneNetly",
+            "name": "FreeNetly",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -221,8 +221,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "OneNetly",
-        "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
+        "name": "FreeNetly",
+        "description": "Share files securely with FreeNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
         "offers": {

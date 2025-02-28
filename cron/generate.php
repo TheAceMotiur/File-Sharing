@@ -109,16 +109,16 @@ function generateUrlEntry($loc, $lastmod, $changefreq, $priority, $imageUrl = nu
     if ($imageUrl) {
         $xml .= "        <image:image>\n";
         $xml .= "            <image:loc>" . htmlspecialchars($imageUrl) . "</image:loc>\n";
-        $xml .= "            <image:title>OneNetly</image:title>\n";
+        $xml .= "            <image:title>FreeNetly</image:title>\n";
         $xml .= "        </image:image>\n";
     }
     
     if ($videoFile) {
         $xml .= "        <video:video>\n";
         $xml .= "            <video:title>" . htmlspecialchars($videoFile['file_name']) . "</video:title>\n";
-        $xml .= "            <video:description>Download " . htmlspecialchars($videoFile['file_name']) . " via OneNetly</video:description>\n";
+        $xml .= "            <video:description>Download " . htmlspecialchars($videoFile['file_name']) . " via FreeNetly</video:description>\n";
         $xml .= "            <video:content_loc>" . htmlspecialchars($loc) . "/download</video:content_loc>\n";
-        $xml .= "            <video:thumbnail_loc>https://onenetly.com/icon.png</video:thumbnail_loc>\n";
+        $xml .= "            <video:thumbnail_loc>https://freenetly.com/icon.png</video:thumbnail_loc>\n";
         $xml .= "        </video:video>\n";
     }
     

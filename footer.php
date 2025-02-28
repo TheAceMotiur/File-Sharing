@@ -16,7 +16,7 @@
       </div>
     </div>
 
-    <div class="py-8 text-center text-sm text-gray-400">© <?php echo date('Y'); ?> - OneNetly. All rights reserved.</div>
+    <div class="py-8 text-center text-sm text-gray-400">© <?php echo date('Y'); ?> - FreeNetly. All rights reserved.</div>
   </footer>
 </div>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
