@@ -5,6 +5,98 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Check if it's a chunked upload
+    if (isset($_POST['chunked']) && $_POST['chunked'] === 'true') {
+        header('Content-Type: application/json');
+        try {
+            // Validate user login
+            if (!isset($_SESSION['user_id'])) {
+                throw new Exception('Login required to upload files');
+            }
+
+            $chunk = isset($_FILES['chunk']) ? $_FILES['chunk'] : null;
+            $chunkNumber = isset($_POST['chunkNumber']) ? (int)$_POST['chunkNumber'] : 0;
+            $totalChunks = isset($_POST['totalChunks']) ? (int)$_POST['totalChunks'] : 0;
+            $fileId = isset($_POST['fileId']) ? $_POST['fileId'] : null;
+            $fileName = isset($_POST['fileName']) ? $_POST['fileName'] : null;
+            $sessionId = isset($_POST['sessionId']) ? $_POST['sessionId'] : null;
+
+            if (!$chunk || !$fileId || !$fileName) {
+                throw new Exception('Invalid chunk upload data');
+            }
+
+            // Get Dropbox account
+            $db = getDBConnection();
+            $dropbox = $db->query("SELECT * FROM dropbox_accounts LIMIT 1")->fetch_assoc();
+            $client = new DropboxClient($dropbox['access_token']);
+
+            // Handle chunk upload
+            $chunkPath = sys_get_temp_dir() . '/' . $fileId . '_' . $chunkNumber;
+            move_uploaded_file($chunk['tmp_name'], $chunkPath);
+
+            if ($chunkNumber === 0) {
+                // Start upload session
+                $response = $client->upload_session_start(fopen($chunkPath, 'r'));
+                $sessionId = $response['session_id'];
+                echo json_encode(['success' => true, 'sessionId' => $sessionId]);
+            } elseif ($chunkNumber < $totalChunks - 1) {
+                // Append to session
+                $client->upload_session_append_v2(fopen($chunkPath, 'r'), $sessionId, $chunkNumber * $chunk['size']);
+                echo json_encode(['success' => true]);
+            } else {
+                // Finish upload
+                $dropboxPath = "/{$fileId}/{$fileName}";
+                $client->upload_session_finish(
+                    fopen($chunkPath, 'r'),
+                    $sessionId,
+                    $chunkNumber * $chunk['size'],
+                    $dropboxPath
+                );
+
+                // Save file info to database
+                $totalSize = $totalChunks * $chunk['size'];
+                $stmt = $db->prepare("INSERT INTO file_uploads (
+                    file_id, 
+                    file_name, 
+                    size, 
+                    upload_status, 
+                    dropbox_path, 
+                    dropbox_account_id, 
+                    uploaded_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                
+                $status = 'completed';
+                $stmt->bind_param("ssissii", 
+                    $fileId,
+                    $fileName,
+                    $totalSize,
+                    $status,
+                    $dropboxPath,
+                    $dropbox['id'],
+                    $_SESSION['user_id']
+                );
+                $stmt->execute();
+
+                $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
+                echo json_encode([
+                    'success' => true,
+                    'downloadLink' => $downloadLink
+                ]);
+            }
+
+            // Cleanup chunk file
+            @unlink($chunkPath);
+
+        } catch (Exception $e) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+        exit;
+    }
+
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
@@ -53,9 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('File type not allowed. Only media and archive files are supported.');
         }
 
-        // Add size validation (100MB = 100 * 1024 * 1024 bytes)
-        if ($file['size'] > 100 * 1024 * 1024) {
-            throw new Exception('File size exceeds 100 MB limit');
+        // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
+        if ($file['size'] > 2 * 1024 * 1024 * 1024) {
+            throw new Exception('File size exceeds 2 GB limit');
         }
 
         // Get Dropbox credentials with available storage
@@ -299,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>
                                     <p class="mt-2 text-gray-600">Drag and drop or click to select</p>
                                     <div class="mt-2 text-sm text-gray-500">
-                                        Maximum file size: 100 MB<br>
+                                        Maximum file size: 2 GB<br>
                                         Supported formats: Images, Audio, Video, Archives
                                     </div>
                                     <input type="file" class="hidden" @change="handleFileSelect" ref="fileInput" required>
@@ -480,7 +572,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     uploading: false,
                     progress: 0,
                     downloadLink: '',
-                    showDownloadSection: false
+                    showDownloadSection: false,
+                    chunkSize: 8 * 1024 * 1024, // 8MB chunks
                 }
             },
             methods: {
@@ -519,60 +612,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 },
                 async uploadFile(file) {
-                    // Add size check at the start
-                    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                    if (!file) return;
+                
+                    // Update size check for 2GB
+                    const maxSize = 2 * 1024 * 1024 * 1024; // 2GB in bytes
                     if (file.size > maxSize) {
-                        alert('File is too large. Maximum file size is 100 MB.');
+                        alert('File is too large. Maximum file size is 2 GB.');
                         return;
                     }
 
                     this.uploading = true;
                     this.progress = 0;
                     
-                    const formData = new FormData();
-                    formData.append('file', file);
-
                     try {
                         NProgress.start();
-                        const xhr = new XMLHttpRequest();
-                        
-                        // Setup progress tracking
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                this.progress = Math.round((e.loaded * 100) / e.total);
+                        const fileId = Date.now().toString();
+                        const totalChunks = Math.ceil(file.size / this.chunkSize);
+                        let sessionId = null;
+
+                        for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
+                            const start = chunkNumber * this.chunkSize;
+                            const end = Math.min(start + this.chunkSize, file.size);
+                            const chunk = file.slice(start, end);
+
+                            const formData = new FormData();
+                            formData.append('chunked', 'true');
+                            formData.append('chunk', chunk);
+                            formData.append('chunkNumber', chunkNumber);
+                            formData.append('totalChunks', totalChunks);
+                            formData.append('fileId', fileId);
+                            formData.append('fileName', file.name);
+                            if (sessionId) formData.append('sessionId', sessionId);
+
+                            const response = await fetch('index.php', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            const result = await response.json();
+                            if (!result.success) throw new Error(result.error);
+                            if (result.sessionId) sessionId = result.sessionId;
+
+                            // Update progress
+                            this.progress = Math.round(((chunkNumber + 1) / totalChunks) * 100);
+
+                            if (chunkNumber === totalChunks - 1) {
+                                this.downloadLink = result.downloadLink;
+                                this.showDownloadSection = true;
                             }
-                        });
-
-                        // Create promise to handle the upload
-                        const uploadPromise = new Promise((resolve, reject) => {
-                            xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                    try {
-                                        const response = JSON.parse(xhr.responseText);
-                                        resolve(response);
-                                    } catch (e) {
-                                        reject(new Error('Invalid JSON response'));
-                                    }
-                                } else {
-                                    reject(new Error('Upload failed'));
-                                }
-                            };
-                            xhr.onerror = () => reject(new Error('Network error'));
-                        });
-
-                        // Configure and send request
-                        xhr.open('POST', 'index.php', true);
-                        xhr.send(formData);
-
-                        // Wait for upload to complete
-                        const response = await uploadPromise;
-                        
-                        if (!response.success) {
-                            throw new Error(response.error || 'Upload failed');
                         }
-                        
-                        this.downloadLink = response.downloadLink;
-                        this.showDownloadSection = true;
+
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);

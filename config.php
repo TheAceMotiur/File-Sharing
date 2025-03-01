@@ -6,6 +6,13 @@ ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
 ini_set('session.cookie_secure', 1);
 ini_set('session.cookie_httponly', 1);
 
+// Set upload limits for 2GB files
+ini_set('upload_max_filesize', '2048M');
+ini_set('post_max_size', '2048M');
+ini_set('memory_limit', '2048M');
+ini_set('max_execution_time', '3600');
+ini_set('max_input_time', '3600');
+
 define('RECAPTCHA_SITE_KEY', '6LfEK8oqAAAAAA4X-xursRqDCIMD4AxPyWjyeIEw');
 define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
 
