@@ -53,9 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('File type not allowed. Only media and archive files are supported.');
         }
 
-        // Add size validation (100MB = 100 * 1024 * 1024 bytes)
-        if ($file['size'] > 100 * 1024 * 1024) {
-            throw new Exception('File size exceeds 100 MB limit');
+        // Add size validation (500MB = 100 * 1024 * 1024 bytes)
+        if ($file['size'] > 500 * 1024 * 1024) {
+            throw new Exception('File size exceeds 500 MB limit');
         }
 
         // Get Dropbox credentials with available storage
