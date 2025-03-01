@@ -9,22 +9,6 @@ RewriteRule ^ /download/%1? [L,R=301]
 RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L]
 RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L]
 
-# PHP Values - Move these to php.ini if possible
-<IfModule mod_php.c>
-    php_value upload_max_filesize 2048M
-    php_value post_max_size 2048M 
-    php_value memory_limit 2048M
-    php_value max_execution_time 3600
-    php_value max_input_time 3600
-</IfModule>
-
-# Increase timeout for large uploads
-php_value max_execution_time 0
-php_value max_input_time -1
-php_value upload_max_filesize 2G
-php_value post_max_size 2G
-php_value memory_limit 256M
-
 # Enable compression
 <IfModule mod_deflate.c>
     SetOutputFilter DEFLATE
