@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/upload_helper.php';
+require_once __DIR__ . '/db_upload_helper.php';
 session_start();
 
 // Ensure user is logged in
@@ -55,6 +56,16 @@ try {
                 }
             }
             
+            // Record upload initialization in database
+            $userId = $_SESSION['user_id'];
+            $fileSize = isset($data['fileSize']) ? $data['fileSize'] : 0;
+            $dbResult = saveUploadStatus($fileId, $userId, 'initialized', $data['fileName'], $fileSize);
+            
+            if (!$dbResult) {
+                logUploadActivity('Failed to record upload initialization in database', 'warning');
+                // Continue anyway as this is not fatal
+            }
+            
             // Return success response
             echo json_encode(['success' => true, 'message' => 'Upload initialized']);
             logUploadActivity('Upload initialized for fileId: ' . $fileId, 'info');
@@ -68,6 +79,7 @@ try {
             
             $fileId = $_POST['fileId'];
             $chunkIndex = $_POST['chunkIndex'];
+            $totalChunks = isset($_POST['totalChunks']) ? intval($_POST['totalChunks']) : 0;
             $chunk = $_FILES['chunk'];
             
             if ($chunk['error'] !== UPLOAD_ERR_OK) {
@@ -90,6 +102,24 @@ try {
                 throw new Exception('Failed to save chunk: Permission denied or disk full');
             }
             
+            // Update progress in database if total chunks is known
+            if ($totalChunks > 0) {
+                $progress = round(($chunkIndex + 1) / $totalChunks * 100);
+                updateUploadProgress($fileId, $progress);
+            }
+            
+            // Check if this was the last chunk and combine if needed
+            if (isset($_POST['isLastChunk']) && $_POST['isLastChunk'] === 'true') {
+                // Update database status to processing
+                saveUploadStatus($fileId, $_SESSION['user_id'], 'processing', $_POST['fileName'] ?? 'unknown');
+                
+                // Combine chunks logic would go here
+                // ...
+                
+                // Update database status to completed
+                saveUploadStatus($fileId, $_SESSION['user_id'], 'completed', $_POST['fileName'] ?? 'unknown');
+            }
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'Chunk uploaded successfully',
@@ -107,11 +137,23 @@ try {
 } catch (Exception $e) {
     error_log('Chunk upload error: ' . $e->getMessage());
     logUploadActivity('Chunk upload error: ' . $e->getMessage(), 'error');
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage()
-    ]);
+    
+    // Check if it's a database-specific error
+    if (strpos($e->getMessage(), 'MySQL server has gone away') !== false) {
+        http_response_code(503);  // Service Unavailable
+        echo json_encode([
+            'success' => false,
+            'error' => 'Database connection lost. Please try again.',
+            'errorCode' => 'DB_CONNECTION_LOST',
+            'recoverable' => true  // Client can retry
+        ]);
+    } else {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
     exit;
 }
 

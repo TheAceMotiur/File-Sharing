@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/database/Database.php';
 header('Content-Type: text/html; charset=utf-8');
 
 // Initialize variables
@@ -85,6 +86,24 @@ EOT;
     $fixAttempts[] = "Creating .htaccess file: " . ($wrote ? 'Success' : 'Failed');
 }
 
+// New fix for MySQL configuration
+if (isset($_POST['fix']) && $_POST['fix'] == 'mysql_config') {
+    try {
+        $db = App\Database::getInstance();
+        $conn = $db->getConnection();
+        
+        // Increase MySQL timeout settings
+        $conn->query("SET GLOBAL wait_timeout=86400");
+        $conn->query("SET GLOBAL interactive_timeout=86400");
+        $conn->query("SET GLOBAL net_read_timeout=3600");
+        $conn->query("SET GLOBAL net_write_timeout=3600");
+        
+        $fixAttempts[] = "MySQL timeout settings updated successfully.";
+    } catch (Exception $e) {
+        $fixAttempts[] = "Failed to update MySQL settings: " . $e->getMessage();
+    }
+}
+
 // Get chunk_upload.php content
 $chunkUploadFile = __DIR__ . '/chunk_upload.php';
 $hasChunkUploadFile = file_exists($chunkUploadFile);
@@ -116,6 +135,32 @@ if (!file_exists(__DIR__ . '/.htaccess')) {
         'issue' => '.htaccess file is missing',
         'fix' => 'htaccess',
         'description' => 'Create .htaccess file to adjust server settings'
+    ];
+}
+
+// Check MySQL configuration
+try {
+    $db = App\Database::getInstance();
+    $conn = $db->getConnection();
+    
+    $result = $conn->query("SHOW VARIABLES LIKE 'wait_timeout'");
+    $waitTimeout = $result->fetch_assoc()['Value'];
+    
+    $result = $conn->query("SHOW VARIABLES LIKE 'interactive_timeout'");
+    $interactiveTimeout = $result->fetch_assoc()['Value'];
+    
+    if (intval($waitTimeout) < 3600 || intval($interactiveTimeout) < 3600) {
+        $fixes[] = [
+            'issue' => 'MySQL timeout settings are too low for large uploads',
+            'fix' => 'mysql_config',
+            'description' => 'Increase MySQL timeout settings to prevent "server has gone away" errors'
+        ];
+    }
+} catch (Exception $e) {
+    $fixes[] = [
+        'issue' => 'Could not check MySQL configuration: ' . $e->getMessage(),
+        'fix' => 'mysql_config',
+        'description' => 'Verify MySQL connection and increase timeout settings'
     ];
 }
 ?>
@@ -313,6 +358,67 @@ if (!file_exists(__DIR__ . '/.htaccess')) {
             ?>
         <?php endif; ?>
         
+        <!-- New section for Database Connection Test -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:px-6">
+                <h2 class="text-lg leading-6 font-medium text-gray-900">Database Connection Test</h2>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">Test database connection stability</p>
+            </div>
+            <div class="border-t border-gray-200">
+                <dl>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Connection Status</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            <?php
+                            try {
+                                $db = App\Database::getInstance();
+                                $conn = $db->getConnection();
+                                
+                                if ($conn->ping()) {
+                                    echo '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Connected</span>';
+                                } else {
+                                    echo '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed to connect</span>';
+                                }
+                            } catch (Exception $e) {
+                                echo '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Error: ' . htmlspecialchars($e->getMessage()) . '</span>';
+                            }
+                            ?>
+                        </dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">MySQL wait_timeout</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            <?php
+                            try {
+                                $db = App\Database::getInstance();
+                                $conn = $db->getConnection();
+                                
+                                $result = $conn->query("SHOW VARIABLES LIKE 'wait_timeout'");
+                                $waitTimeout = $result->fetch_assoc()['Value'];
+                                
+                                echo $waitTimeout . ' seconds';
+                                echo '<span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' . 
+                                    (intval($waitTimeout) >= 3600 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') . 
+                                    '">' . (intval($waitTimeout) >= 3600 ? 'OK' : 'Low (Recommended: 86400)') . '</span>';
+                            } catch (Exception $e) {
+                                echo '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Error: ' . htmlspecialchars($e->getMessage()) . '</span>';
+                            }
+                            ?>
+                        </dd>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Connection Test</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            <button id="testDbButton" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Test Database Connection
+                            </button>
+                            <div id="dbTestResults" class="mt-2"></div>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+        
         <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
             <div class="px-4 py-5 sm:px-6">
                 <h2 class="text-lg leading-6 font-medium text-gray-900">Test Chunk Upload</h2>
@@ -420,6 +526,30 @@ if (!file_exists(__DIR__ . '/.htaccess')) {
                     console.error(error);
                 }
             });
+            
+            // Add database connection test
+            document.getElementById('testDbButton').addEventListener('click', async function() {
+                const results = document.getElementById('dbTestResults');
+                results.innerHTML = '<p class="text-blue-600">Testing database connection...</p>';
+                
+                try {
+                    // Make an AJAX call to a test endpoint
+                    const response = await fetch('db-test.php');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        results.innerHTML = '<p class="text-green-600">✓ Database connection successful</p>';
+                        if (data.timeouts) {
+                            results.innerHTML += `<p>wait_timeout: ${data.timeouts.wait_timeout}</p>`;
+                            results.innerHTML += `<p>interactive_timeout: ${data.timeouts.interactive_timeout}</p>`;
+                        }
+                    } else {
+                        results.innerHTML = `<p class="text-red-600">✗ Database connection failed: ${data.error}</p>`;
+                    }
+                } catch (error) {
+                    results.innerHTML = `<p class="text-red-600">✗ Error during test: ${error.message}</p>`;
+                }
+            });
         </script>
         
         <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
@@ -440,6 +570,16 @@ memory_limit = 512M</pre>
                         </li>
                         <li>If using Apache, ensure the LimitRequestBody directive is set high enough</li>
                         <li>If using Nginx, check client_max_body_size setting</li>
+                        <li>For long-running uploads, configure MySQL properly:
+                            <pre class="bg-gray-100 p-2 rounded">
+[mysqld]
+wait_timeout = 86400
+interactive_timeout = 86400
+net_read_timeout = 3600
+net_write_timeout = 3600
+max_allowed_packet = 256M</pre>
+                        </li>
+                        <li>Implement reconnection logic in your database layer to handle "MySQL server has gone away" errors</li>
                     </ul>
                 </div>
             </div>
