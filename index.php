@@ -215,6 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
+    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@3.1.0/dist/tus.min.js"></script>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -355,7 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                     </svg>
                                     Copy Link
                                 </button>
@@ -414,8 +415,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <!-- Fast Transfer Feature -->
                     <div class="text-center p-6">
-                        <div class="bg-purple-100 rounded-full p-3 inline-flex mx-auto mb-4">
-                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 24 24">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-purple-100">
+                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                       d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
@@ -480,7 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     uploading: false,
                     progress: 0,
                     downloadLink: '',
-                    showDownloadSection: false
+                    showDownloadSection: false,
+                    upload: null
                 }
             },
             methods: {
@@ -528,59 +530,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     this.uploading = true;
                     this.progress = 0;
-                    
-                    const formData = new FormData();
-                    formData.append('file', file);
 
                     try {
                         NProgress.start();
-                        const xhr = new XMLHttpRequest();
                         
-                        // Setup progress tracking
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                this.progress = Math.round((e.loaded * 100) / e.total);
+                        // Create a new tus upload
+                        this.upload = new tus.Upload(file, {
+                            endpoint: '/upload.php',
+                            retryDelays: [0, 3000, 5000, 10000, 20000],
+                            metadata: {
+                                filename: file.name,
+                                filetype: file.type
+                            },
+                            onError: (error) => {
+                                console.error('Upload failed:', error);
+                                alert('Upload failed: ' + error.message);
+                                this.uploading = false;
+                                NProgress.done();
+                            },
+                            onProgress: (bytesUploaded, bytesTotal) => {
+                                this.progress = Math.round((bytesUploaded / bytesTotal) * 100);
+                            },
+                            onSuccess: () => {
+                                // Process server response
+                                fetch(this.upload.url, { method: 'POST' })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.downloadLink = data.downloadLink;
+                                            this.showDownloadSection = true;
+                                        } else {
+                                            throw new Error(data.error || 'Upload failed');
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Upload error:', error);
+                                        alert('Upload failed: ' + error.message);
+                                    })
+                                    .finally(() => {
+                                        this.uploading = false;
+                                        NProgress.done();
+                                    });
                             }
                         });
 
-                        // Create promise to handle the upload
-                        const uploadPromise = new Promise((resolve, reject) => {
-                            xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                    try {
-                                        const response = JSON.parse(xhr.responseText);
-                                        resolve(response);
-                                    } catch (e) {
-                                        reject(new Error('Invalid JSON response'));
-                                    }
-                                } else {
-                                    reject(new Error('Upload failed'));
-                                }
-                            };
-                            xhr.onerror = () => reject(new Error('Network error'));
-                        });
+                        // Start the upload
+                        this.upload.start();
 
-                        // Configure and send request
-                        xhr.open('POST', 'index.php', true);
-                        xhr.send(formData);
-
-                        // Wait for upload to complete
-                        const response = await uploadPromise;
-                        
-                        if (!response.success) {
-                            throw new Error(response.error || 'Upload failed');
-                        }
-                        
-                        this.downloadLink = response.downloadLink;
-                        this.showDownloadSection = true;
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
-                    } finally {
                         this.uploading = false;
                         NProgress.done();
                     }
                 },
+
+                // Add method to pause/resume upload
+                toggleUpload() {
+                    if (!this.upload) return;
+
+                    if (this.upload.isRunning()) {
+                        this.upload.abort();
+                    } else {
+                        this.upload.start();
+                    }
+                },
+
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
