@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fileSize = $_POST['totalSize'];
 
             // Validate total file size (100MB limit)
-            if ($fileSize > 100 * 1024 * 1024) {
+            if ($fileSize > 500 * 1024 * 1024) {
                 throw new Exception('File size exceeds 100 MB limit');
             }
 
@@ -195,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Add size validation (100MB = 100 * 1024 * 1024 bytes)
-        if ($file['size'] > 100 * 1024 * 1024) {
+        if ($file['size'] > 500 * 1024 * 1024) {
             throw new Exception('File size exceeds 100 MB limit');
         }
 
