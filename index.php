@@ -24,7 +24,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('File upload failed');
+            $errorMessages = [
+                UPLOAD_ERR_INI_SIZE => 'File exceeds PHP maximum upload size',
+                UPLOAD_ERR_FORM_SIZE => 'File exceeds form maximum size',
+                UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+                UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+                UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+            ];
+            $errorMessage = $errorMessages[$file['error']] ?? 'Unknown upload error';
+            throw new Exception('File upload failed: ' . $errorMessage);
         }
 
         // Add allowed file types
@@ -121,7 +131,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(400);
         echo json_encode([
             'success' => false,
-            'error' => $e->getMessage()
+            'error' => $e->getMessage(),
+            'errorCode' => $e->getCode()
+        ]);
+        exit;
+    } catch (Throwable $t) {
+        error_log('Upload error: ' . $t->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'An unexpected error occurred. Please try again.'
         ]);
         exit;
     }
@@ -537,34 +556,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         const uploadPromise = new Promise((resolve, reject) => {
                             xhr.onload = () => {
-                                let response;
-                                try {
-                                    response = JSON.parse(xhr.responseText);
-                                } catch (e) {
-                                    reject(new Error('Invalid server response'));
-                                    return;
-                                }
-
-                                if (xhr.status >= 200 && xhr.status < 300 && response.success) {
-                                    resolve(response);
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    try {
+                                        const response = JSON.parse(xhr.responseText);
+                                        if (response.success) {
+                                            resolve(response);
+                                        } else {
+                                            reject(new Error(response.error || 'Upload failed'));
+                                        }
+                                    } catch (e) {
+                                        reject(new Error('Invalid server response'));
+                                    }
                                 } else {
-                                    reject(new Error(response.error || 'Upload failed'));
+                                    let errorMessage = 'Upload failed';
+                                    try {
+                                        const response = JSON.parse(xhr.responseText);
+                                        errorMessage = response.error || errorMessage;
+                                    } catch (e) {}
+                                    reject(new Error(errorMessage));
                                 }
                             };
                             xhr.onerror = () => reject(new Error('Network error occurred'));
                             xhr.onabort = () => reject(new Error('Upload cancelled'));
                         });
 
-                        xhr.open('POST', 'index.php', true);
+                        xhr.open('POST', window.location.href, true);
                         xhr.send(formData);
 
                         const response = await uploadPromise;
                         this.downloadLink = response.downloadLink;
                         this.showDownloadSection = true;
+                        
+                        // Only reset file input if it exists
+                        if (this.$refs.fileInput) {
+                            this.$refs.fileInput.value = '';
+                        }
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert(error.message || 'Upload failed. Please try again.');
-                        this.$refs.fileInput.value = ''; // Reset file input
+                        // Only reset file input if it exists
+                        if (this.$refs.fileInput) {
+                            this.$refs.fileInput.value = '';
+                        }
                     } finally {
                         this.uploading = false;
                         this.progress = 0;
