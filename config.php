@@ -12,24 +12,35 @@ define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
 function getDBConnection() {
     static $db = null;
     
-    if ($db === null) {
+    if ($db === null || !$db->ping()) {
         $host = 'localhost';
         $dbname = 'TheAceMotiur_fileswith';
         $username = 'TheAceMotiur_fileswith';
         $password = 'AmiMotiur27@';
 
         try {
+            // Close existing connection if it exists
+            if ($db !== null) {
+                $db->close();
+            }
+
+            // Create new connection with persistent settings
             $db = new mysqli($host, $username, $password, $dbname);
 
             if ($db->connect_error) {
                 throw new Exception("Connection failed: " . $db->connect_error);
             }
 
-            // Set charset to utf8mb4
+            // Configure connection
             $db->set_charset('utf8mb4');
-
-            // Set error reporting
             mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+            // Set connection timeout and wait_timeout
+            $db->query("SET SESSION wait_timeout=28800"); // 8 hours
+            $db->query("SET SESSION interactive_timeout=28800");
+            
+            // Enable reconnect
+            $db->options(MYSQLI_OPT_RECONNECT, true);
 
         } catch(Exception $e) {
             error_log("Database connection failed: " . $e->getMessage());
