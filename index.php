@@ -519,13 +519,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 },
                 async uploadFile(file) {
-                    // Add size check at the start
-                    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
-                    if (file.size > maxSize) {
-                        alert('File is too large. Maximum file size is 100 MB.');
-                        return;
-                    }
-
                     this.uploading = true;
                     this.progress = 0;
                     
@@ -536,48 +529,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         NProgress.start();
                         const xhr = new XMLHttpRequest();
                         
-                        // Setup progress tracking
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
                                 this.progress = Math.round((e.loaded * 100) / e.total);
                             }
                         });
 
-                        // Create promise to handle the upload
                         const uploadPromise = new Promise((resolve, reject) => {
                             xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                    try {
-                                        const response = JSON.parse(xhr.responseText);
-                                        resolve(response);
-                                    } catch (e) {
-                                        reject(new Error('Invalid JSON response'));
-                                    }
+                                let response;
+                                try {
+                                    response = JSON.parse(xhr.responseText);
+                                } catch (e) {
+                                    reject(new Error('Invalid server response'));
+                                    return;
+                                }
+
+                                if (xhr.status >= 200 && xhr.status < 300 && response.success) {
+                                    resolve(response);
                                 } else {
-                                    reject(new Error('Upload failed'));
+                                    reject(new Error(response.error || 'Upload failed'));
                                 }
                             };
-                            xhr.onerror = () => reject(new Error('Network error'));
+                            xhr.onerror = () => reject(new Error('Network error occurred'));
+                            xhr.onabort = () => reject(new Error('Upload cancelled'));
                         });
 
-                        // Configure and send request
                         xhr.open('POST', 'index.php', true);
                         xhr.send(formData);
 
-                        // Wait for upload to complete
                         const response = await uploadPromise;
-                        
-                        if (!response.success) {
-                            throw new Error(response.error || 'Upload failed');
-                        }
-                        
                         this.downloadLink = response.downloadLink;
                         this.showDownloadSection = true;
                     } catch (error) {
                         console.error('Upload error:', error);
-                        alert('Upload failed: ' + error.message);
+                        alert(error.message || 'Upload failed. Please try again.');
+                        this.$refs.fileInput.value = ''; // Reset file input
                     } finally {
                         this.uploading = false;
+                        this.progress = 0;
                         NProgress.done();
                     }
                 },

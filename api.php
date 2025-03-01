@@ -38,7 +38,17 @@ class API {
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('File upload failed');
+            $errorMessages = [
+                UPLOAD_ERR_INI_SIZE => 'File exceeds PHP maximum upload size',
+                UPLOAD_ERR_FORM_SIZE => 'File exceeds form maximum size',
+                UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+                UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+                UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+            ];
+            $errorMessage = $errorMessages[$file['error']] ?? 'Unknown upload error';
+            throw new Exception('File upload failed: ' . $errorMessage);
         }
 
         // 100MB size limit
@@ -300,10 +310,12 @@ class API {
             ]);
 
         } catch (Exception $e) {
+            error_log('API Error: ' . $e->getMessage());
             http_response_code(400);
             echo json_encode([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'errorCode' => $e->getCode()
             ]);
         }
     }
