@@ -5,41 +5,26 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if user is logged intion/json');
+    // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
-        http_response_code(401);er_id'])) {
-        echo json_encode([code(401);
-            'success' => false,('Login required to upload files');
+        http_response_code(401);
+        echo json_encode([
+            'success' => false,
             'error' => 'Login required to upload files'
         ]);
-        exit;eck if file was uploaded
-    }   if (!isset($_FILES['file']) || !isset($_FILES['file']['error'])) {
-            http_response_code(400);
-    header('Content-Type: application/json');aded');
+        exit;
+    }
+
+    header('Content-Type: application/json');
     try {
         if (!isset($_FILES['file'])) {
             throw new Exception('No file uploaded');
-        }witch ($_FILES['file']['error']) {
-            case UPLOAD_ERR_INI_SIZE:
-        $file = $_FILES['file'];ion('File exceeds upload_max_filesize');
+        }
+
+        $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('File upload failed');FILE_SIZE');
-        }   case UPLOAD_ERR_PARTIAL:
-                throw new Exception('File was only partially uploaded');
-        // Add allowed file typesLE:
-        $allowedTypes = [ Exception('No file was uploaded');
-            // ImagesAD_ERR_NO_TMP_DIR:
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-            // AudioOAD_ERR_CANT_WRITE:
-            'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
-            // VideoOAD_ERR_EXTENSION:
-            'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-            // Archives
-            'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-            'application/x-tar', 'application/gzip',
-            // Documents'] !== UPLOAD_ERR_OK) {
-            'application/pdf', 'image/vnd.djvu',led');
+            throw new Exception('File upload failed');
         }
 
         // Add allowed file types
@@ -133,9 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
 
     } catch (Exception $e) {
-        if (http_response_code() === 200) {
-            http_response_code(400);
-        }
+        http_response_code(400);
         echo json_encode([
             'success' => false,
             'error' => $e->getMessage()
@@ -524,113 +507,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'pdf', 'djvu',
                             // Other media
                             'm3u8', 'm3u'
-                        ];/ Add size check at the start
-                                            const maxSize = 100 * 1024 * 1024; // 100MB in bytes
-                        const extension = file.name.split('.').pop().toLowerCase();e) {
-                        if (!allowedExtensions.includes(extension)) { too large. Maximum file size is 100 MB.');
-                            alert('File type not allowed. Only media and archive files are supported.');    return;
+                        ];
+                        
+                        const extension = file.name.split('.').pop().toLowerCase();
+                        if (!allowedExtensions.includes(extension)) {
+                            alert('File type not allowed. Only media and archive files are supported.');
                             return;
                         }
-                                            this.uploading = true;
-                        this.uploadFile(file);progress = 0;
+                        
+                        this.uploadFile(file);
                     }
                 },
-                async uploadFile(file) {Data.append('file', file);
+                async uploadFile(file) {
                     // Add size check at the start
                     const maxSize = 100 * 1024 * 1024; // 100MB in bytes
                     if (file.size > maxSize) {
                         alert('File is too large. Maximum file size is 100 MB.');
                         return;
-                    }Setup progress tracking
-                        xhr.upload.addEventListener('progress', (e) => {
+                    }
+
                     this.uploading = true;
-                    this.progress = 0;total);
+                    this.progress = 0;
                     
                     const formData = new FormData();
                     formData.append('file', file);
 
-                    try {(resolve, reject) => {
+                    try {
                         NProgress.start();
                         const xhr = new XMLHttpRequest();
-                        onst response = JSON.parse(xhr.responseText);
-                        // Setup progress trackingxhr.status >= 200 && xhr.status < 300 && response.success) {
+                        
+                        // Setup progress tracking
                         xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {   } else {
-                                this.progress = Math.round((e.loaded * 100) / e.total);          reject(new Error(response.error || 'Upload failed'));
+                            if (e.lengthComputable) {
+                                this.progress = Math.round((e.loaded * 100) / e.total);
                             }
-                        });     } catch (e) {
-                                    reject(new Error('Invalid server response'));
+                        });
+
                         // Create promise to handle the upload
                         const uploadPromise = new Promise((resolve, reject) => {
-                            xhr.onload = () => {) => reject(new Error('Network error'));
-                                if (xhr.status >= 200 && xhr.status < 300) {                        });
+                            xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) {
                                     try {
                                         const response = JSON.parse(xhr.responseText);
-                                        resolve(response);xhr.open('POST', 'index.php', true);
+                                        resolve(response);
                                     } catch (e) {
                                         reject(new Error('Invalid JSON response'));
-                                    }/ Wait for upload to complete
-                                } else {const response = await uploadPromise;
+                                    }
+                                } else {
                                     reject(new Error('Upload failed'));
-                                }nloadLink;
-                            };loadSection = true;
+                                }
+                            };
                             xhr.onerror = () => reject(new Error('Network error'));
                         });
-                        alert(error.message || 'Upload failed. Please try again.');
-                    } finally {equest
-                        this.uploading = false;'index.php', true);
-                        NProgress.done();   xhr.send(formData);
+
+                        // Configure and send request
+                        xhr.open('POST', 'index.php', true);
+                        xhr.send(formData);
+
+                        // Wait for upload to complete
+                        const response = await uploadPromise;
+                        
+                        if (!response.success) {
+                            throw new Error(response.error || 'Upload failed');
+                        }
+                        
+                        this.downloadLink = response.downloadLink;
+                        this.showDownloadSection = true;
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert('Upload failed: ' + error.message);
+                    } finally {
+                        this.uploading = false;
+                        NProgress.done();
                     }
-                },upload to complete
+                },
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
-                    const originalText = copyBtn.innerHTML;        throw new Error(response.error || 'Upload failed');
+                    const originalText = copyBtn.innerHTML;
                     
                     copyText.select();
-                    navigator.clipboard.writeText(copyText.value);    this.downloadLink = response.downloadLink;
-                    true;
+                    navigator.clipboard.writeText(copyText.value);
+                    
                     // Update button text and style
-                    copyBtn.innerHTML = `error);
+                    copyBtn.innerHTML = `
                         <div class="flex items-center">
                             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>ding = false;
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                             </svg>
                             <span>Copied</span>
                         </div>
                     `;
                     copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');const copyBtn = event.target;
-                    nnerHTML;
+                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    
                     // Reset button after 1 second
                     setTimeout(() => {
                         copyBtn.innerHTML = originalText;
                         copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                        copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700'); button text and style
-                    }, 1000);   copyBtn.innerHTML = `
-                }           <div class="flex items-center">
-            }    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        }).mount('#app')                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-    </script>                     </svg>
-</body>                     <span>Copied</span>
+                        copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    }, 1000);
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
 </html>
-<!-- Add this CSS for better mobile responsiveness -->             `;
-<style>.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-@media (max-width: 576px) {  copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-    .input-group {
-        flex-direction: column;               // Reset button after 1 second
-    }) => {
-    .input-group .form-control { = originalText;
-        border-radius: .25rem !important;Btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-        margin-bottom: 10px;                   copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-    }1000);
-    .input-group .btn {
-        border-radius: .25rem !important;
-        width: 100%;   }).mount('#app')
-    }   </script>
-}
-
-</style></html>
 <!-- Add this CSS for better mobile responsiveness -->
 <style>
 @media (max-width: 576px) {
