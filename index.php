@@ -5,6 +5,147 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    
+    // Handle chunk uploads
+    if (isset($_POST['chunk'])) {
+        try {
+            if (!isset($_SESSION['user_id'])) {
+                throw new Exception('Login required to upload files');
+            }
+
+            $chunk = $_POST['chunk'];
+            $totalChunks = $_POST['totalChunks'];
+            $currentChunk = $_POST['currentChunk'];
+            $fileId = $_POST['fileId'];
+            $fileName = $_POST['fileName'];
+            $fileSize = $_POST['totalSize'];
+
+            // Validate total file size (100MB limit)
+            if ($fileSize > 100 * 1024 * 1024) {
+                throw new Exception('File size exceeds 100 MB limit');
+            }
+
+            // Create temporary directory for chunks if not exists
+            $chunksDir = __DIR__ . '/chunks/' . $fileId;
+            if (!file_exists($chunksDir)) {
+                mkdir($chunksDir, 0777, true);
+            }
+
+            // Save chunk
+            $chunkFile = $chunksDir . '/' . $currentChunk;
+            file_put_contents($chunkFile, base64_decode($chunk));
+
+            // Check if all chunks are received
+            if ($currentChunk == $totalChunks - 1) {
+                // Combine chunks
+                $finalFile = fopen($chunksDir . '/' . $fileName, 'wb');
+                for ($i = 0; $i < $totalChunks; $i++) {
+                    $chunkContent = file_get_contents($chunksDir . '/' . $i);
+                    fwrite($finalFile, $chunkContent);
+                    unlink($chunksDir . '/' . $i);
+                }
+                fclose($finalFile);
+
+                // Get file mime type
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_file($finfo, $chunksDir . '/' . $fileName);
+                finfo_close($finfo);
+
+                // Validate file type
+                $allowedTypes = [
+                    // Images
+                    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                    // Audio
+                    'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
+                    // Video
+                    'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
+                    // Archives
+                    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+                    'application/x-tar', 'application/gzip',
+                    // Documents
+                    'application/pdf', 'image/vnd.djvu',
+                    // Other media
+                    'application/vnd.apple.mpegurl', 'application/x-mpegurl'
+                ];
+
+                if (!in_array($mimeType, $allowedTypes)) {
+                    // Cleanup and throw error
+                    array_map('unlink', glob($chunksDir . '/*'));
+                    rmdir($chunksDir);
+                    throw new Exception('File type not allowed');
+                }
+
+                // Upload to Dropbox
+                $db = getDBConnection();
+                $dropbox = $db->query("
+                    SELECT da.*, 
+                           COALESCE(SUM(fu.size), 0) as used_storage
+                    FROM dropbox_accounts da
+                    LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
+                        AND fu.upload_status = 'completed'
+                    GROUP BY da.id
+                    HAVING used_storage < 2147483648 OR used_storage IS NULL
+                    LIMIT 1
+                ")->fetch_assoc();
+
+                if (!$dropbox) {
+                    throw new Exception('No storage available');
+                }
+
+                $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+                $dropboxPath = "/{$fileId}/{$fileName}";
+                
+                // Upload to Dropbox using chunks
+                $handle = fopen($chunksDir . '/' . $fileName, 'rb');
+                $cursor = $client->uploadSessionStart(fread($handle, 1024 * 1024 * 10));
+                
+                while (!feof($handle)) {
+                    $client->uploadSessionAppend(fread($handle, 1024 * 1024 * 10), $cursor);
+                }
+                
+                $client->uploadSessionFinish('', $cursor, $dropboxPath);
+                fclose($handle);
+
+                // Save to database
+                $stmt = $db->prepare("INSERT INTO file_uploads (
+                    file_id, file_name, size, upload_status, dropbox_path, 
+                    dropbox_account_id, uploaded_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                
+                $status = 'completed';
+                $stmt->bind_param("ssissii", 
+                    $fileId,
+                    $fileName,
+                    $fileSize,
+                    $status,
+                    $dropboxPath,
+                    $dropbox['id'],
+                    $_SESSION['user_id']
+                );
+                $stmt->execute();
+
+                // Cleanup
+                array_map('unlink', glob($chunksDir . '/*'));
+                rmdir($chunksDir);
+
+                echo json_encode([
+                    'success' => true,
+                    'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
+                ]);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'chunk' => $currentChunk]);
+            exit;
+
+        } catch (Exception $e) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
+    }
+
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         header('Content-Type: application/json');
@@ -519,9 +660,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 },
                 async uploadFile(file) {
-                    // Add size check at the start
-                    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
-                    if (file.size > maxSize) {
+                    if (file.size > 100 * 1024 * 1024) {
                         alert('File is too large. Maximum file size is 100 MB.');
                         return;
                     }
@@ -529,50 +668,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     this.uploading = true;
                     this.progress = 0;
                     
-                    const formData = new FormData();
-                    formData.append('file', file);
+                    const chunkSize = 1024 * 1024; // 1MB chunks
+                    const totalChunks = Math.ceil(file.size / chunkSize);
+                    const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);
 
                     try {
                         NProgress.start();
-                        const xhr = new XMLHttpRequest();
                         
-                        // Setup progress tracking
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                this.progress = Math.round((e.loaded * 100) / e.total);
-                            }
-                        });
-
-                        // Create promise to handle the upload
-                        const uploadPromise = new Promise((resolve, reject) => {
-                            xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
+                        for (let i = 0; i < totalChunks; i++) {
+                            const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+                            const reader = new FileReader();
+                            
+                            await new Promise((resolve, reject) => {
+                                reader.onload = async () => {
                                     try {
-                                        const response = JSON.parse(xhr.responseText);
-                                        resolve(response);
-                                    } catch (e) {
-                                        reject(new Error('Invalid JSON response'));
+                                        const base64Chunk = reader.result.split(',')[1];
+                                        const response = await fetch('index.php', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/x-www-form-urlencoded',
+                                            },
+                                            body: new URLSearchParams({
+                                                chunk: base64Chunk,
+                                                totalChunks: totalChunks,
+                                                currentChunk: i,
+                                                fileId: fileId,
+                                                fileName: file.name,
+                                                totalSize: file.size
+                                            })
+                                        });
+
+                                        const result = await response.json();
+                                        if (!result.success) throw new Error(result.error);
+                                        
+                                        this.progress = Math.round((i + 1) * 100 / totalChunks);
+                                        resolve();
+                                    } catch (error) {
+                                        reject(error);
                                     }
-                                } else {
-                                    reject(new Error('Upload failed'));
-                                }
-                            };
-                            xhr.onerror = () => reject(new Error('Network error'));
-                        });
-
-                        // Configure and send request
-                        xhr.open('POST', 'index.php', true);
-                        xhr.send(formData);
-
-                        // Wait for upload to complete
-                        const response = await uploadPromise;
-                        
-                        if (!response.success) {
-                            throw new Error(response.error || 'Upload failed');
+                                };
+                                reader.onerror = reject;
+                                reader.readAsDataURL(chunk);
+                            });
                         }
-                        
-                        this.downloadLink = response.downloadLink;
+
+                        this.downloadLink = `https://${window.location.host}/download/${fileId}`;
                         this.showDownloadSection = true;
+
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
