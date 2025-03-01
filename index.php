@@ -21,9 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fileName = $_POST['fileName'];
             $fileSize = $_POST['totalSize'];
 
-            // Validate total file size (100MB limit)
-            if ($fileSize > 500 * 1024 * 1024) {
-                throw new Exception('File size exceeds 100 MB limit');
+            // Validate total file size (2GB limit)
+            if ($fileSize > 2 * 1024 * 1024 * 1024) {
+                throw new Exception('File size exceeds 2 GB limit');
             }
 
             // Create temporary directory for chunks if not exists
@@ -194,9 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('File type not allowed. Only media and archive files are supported.');
         }
 
-        // Add size validation (100MB = 100 * 1024 * 1024 bytes)
-        if ($file['size'] > 500 * 1024 * 1024) {
-            throw new Exception('File size exceeds 100 MB limit');
+        // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
+        if ($file['size'] > 2 * 1024 * 1024 * 1024) {
+            throw new Exception('File size exceeds 2 GB limit');
         }
 
         // Get Dropbox credentials with available storage
@@ -440,7 +440,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>
                                     <p class="mt-2 text-gray-600">Drag and drop or click to select</p>
                                     <div class="mt-2 text-sm text-gray-500">
-                                        Maximum file size: 100 MB<br>
+                                        Maximum file size: 2 GB<br>
                                         Supported formats: Images, Audio, Video, Archives
                                     </div>
                                     <input type="file" class="hidden" @change="handleFileSelect" ref="fileInput" required>
@@ -660,15 +660,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 },
                 async uploadFile(file) {
-                    if (file.size > 100 * 1024 * 1024) {
-                        alert('File is too large. Maximum file size is 100 MB.');
+                    if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit
+                        alert('File is too large. Maximum file size is 2 GB.');
                         return;
                     }
 
                     this.uploading = true;
                     this.progress = 0;
                     
-                    const chunkSize = 1024 * 1024; // 1MB chunks
+                    const chunkSize = 5 * 1024 * 1024; // Increased to 5MB chunks for better performance
                     const totalChunks = Math.ceil(file.size / chunkSize);
                     const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);
 
