@@ -13,30 +13,9 @@ RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L]
 <IfModule mod_php.c>
     php_value upload_max_filesize 2048M
     php_value post_max_size 2048M 
-    php_value memory_limit 512M
+    php_value memory_limit 2048M
     php_value max_execution_time 3600
     php_value max_input_time 3600
-    php_flag display_errors Off
-    php_value session.gc_maxlifetime 14400
-</IfModule>
-
-# Increase timeout for Apache
-<IfModule mod_reqtimeout.c>
-    RequestReadTimeout header=60 body=3600
-</IfModule>
-
-# Allow large uploads
-<IfModule mod_security.c>
-    SecFilterEngine Off
-    SecFilterScanPOST Off
-</IfModule>
-
-# Prevent timeout
-<IfModule mod_fcgid.c>
-    FcgidIOTimeout 3600
-    FcgidConnectTimeout 3600
-    FcgidIdleTimeout 3600
-    FcgidBusyTimeout 3600
 </IfModule>
 
 # Remove .php extension
