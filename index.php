@@ -536,7 +536,8 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                     showDownloadSection: false,
                     chunkStats: null,
                     chunkSize: 2 * 1024 * 1024, // 2MB chunks
-                    uploadAbort: null
+                    uploadAbort: null,
+                    maxRetries: 3
                 }
             },
             methods: {
@@ -629,7 +630,7 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                                     reject(new Error('Invalid JSON response'));
                                 }
                             } else {
-                                reject(new Error('Upload failed'));
+                                reject(new Error('Upload failed with status: ' + xhr.status));
                             }
                         };
                         xhr.onerror = () => reject(new Error('Network error'));
@@ -660,7 +661,7 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                         let totalUploaded = 0;
                         
                         // Create a directory for chunks
-                        const initResponse = await fetch('chunk_upload.php', {
+                        const initResponse = await this.fetchWithTimeout('chunk_upload.php', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -671,15 +672,24 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                                 fileName: file.name,
                                 totalChunks: totalChunks,
                                 fileSize: file.size
-                            })
+                            }),
+                            timeout: 10000 // 10 second timeout
                         });
                         
-                        if (!initResponse.ok) {
-                            const errorData = await initResponse.json();
-                            throw new Error(errorData.error || 'Failed to initialize upload');
+                        // Process response
+                        let initData;
+                        try {
+                            initData = await initResponse.json();
+                        } catch (e) {
+                            console.error('Failed to parse init response as JSON', e);
+                            throw new Error('Server returned invalid JSON during initialization');
                         }
                         
-                        // Upload each chunk
+                        if (!initData.success) {
+                            throw new Error(initData.error || 'Failed to initialize upload');
+                        }
+                        
+                        // Upload each chunk with retry logic
                         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
                             const start = chunkIndex * this.chunkSize;
                             const end = Math.min(file.size, start + this.chunkSize);
@@ -690,21 +700,22 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                                 total: totalChunks
                             };
                             
-                            const formData = new FormData();
-                            formData.append('chunk', chunk);
-                            formData.append('fileId', fileId);
-                            formData.append('chunkIndex', chunkIndex);
-                            formData.append('fileName', file.name);
-                            formData.append('totalChunks', totalChunks);
+                            let attempts = 0;
+                            let success = false;
                             
-                            const chunkResponse = await fetch('chunk_upload.php', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            
-                            if (!chunkResponse.ok) {
-                                const errorData = await chunkResponse.json();
-                                throw new Error(errorData.error || `Failed to upload chunk ${chunkIndex + 1}`);
+                            while (attempts < this.maxRetries && !success) {
+                                try {
+                                    attempts++;
+                                    await this.uploadChunk(chunk, fileId, chunkIndex, file.name, totalChunks);
+                                    success = true;
+                                } catch (error) {
+                                    console.error(`Chunk ${chunkIndex + 1} upload failed (attempt ${attempts}):`, error);
+                                    if (attempts >= this.maxRetries) {
+                                        throw new Error(`Failed to upload chunk ${chunkIndex + 1} after ${this.maxRetries} attempts`);
+                                    }
+                                    // Wait before retrying (exponential backoff)
+                                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+                                }
                             }
                             
                             uploadedChunks++;
@@ -719,17 +730,20 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                         finalFormData.append('totalSize', file.size);
                         finalFormData.append('chunksComplete', 'true');
                         
-                        const finalResponse = await fetch('index.php', {
+                        const finalResponse = await this.fetchWithTimeout('index.php', {
                             method: 'POST',
-                            body: finalFormData
+                            body: finalFormData,
+                            timeout: 30000 // 30 second timeout for finalization
                         });
                         
-                        if (!finalResponse.ok) {
-                            const errorData = await finalResponse.json();
-                            throw new Error(errorData.error || 'Failed to finalize upload');
+                        // Process response
+                        let result;
+                        try {
+                            result = await finalResponse.json();
+                        } catch (e) {
+                            console.error('Failed to parse final response as JSON', e);
+                            throw new Error('Server returned invalid JSON during finalization');
                         }
-                        
-                        const result = await finalResponse.json();
                         
                         if (!result.success) {
                             throw new Error(result.error || 'Upload failed');
@@ -741,6 +755,77 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                         console.error('Chunked upload error:', error);
                         throw error;
                     }
+                },
+                async uploadChunk(chunk, fileId, chunkIndex, fileName, totalChunks) {
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('fileId', fileId);
+                    formData.append('chunkIndex', chunkIndex);
+                    formData.append('fileName', fileName);
+                    formData.append('totalChunks', totalChunks);
+                    
+                    const response = await this.fetchWithTimeout('chunk_upload.php', {
+                        method: 'POST',
+                        body: formData,
+                        timeout: 30000 // 30 second timeout per chunk
+                    });
+                    
+                    // Process response
+                    let responseData;
+                    try {
+                        responseData = await response.json();
+                    } catch (e) {
+                        console.error('Failed to parse chunk response as JSON', e);
+                        throw new Error('Server returned invalid JSON during chunk upload');
+                    }
+                    
+                    if (!responseData.success) {
+                        throw new Error(responseData.error || `Failed to upload chunk ${chunkIndex + 1}`);
+                    }
+                    
+                    return responseData;
+                },
+                // Helper method to add timeout to fetch requests
+                fetchWithTimeout(url, options = {}) {
+                    const { timeout = 8000, ...remainingOptions } = options;
+                    
+                    return new Promise((resolve, reject) => {
+                        // Set up the timeout
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => {
+                            controller.abort();
+                            reject(new Error(`Request to ${url} timed out after ${timeout}ms`));
+                        }, timeout);
+                        
+                        fetch(url, {
+                            ...remainingOptions,
+                            signal: controller.signal
+                        })
+                        .then(response => {
+                            clearTimeout(timeoutId);
+                            if (!response.ok) {
+                                return response.json()
+                                    .then(errorData => {
+                                        throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                                    })
+                                    .catch(e => {
+                                        if (e instanceof SyntaxError) {
+                                            throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        throw e;
+                                    });
+                            }
+                            resolve(response);
+                        })
+                        .catch(error => {
+                            clearTimeout(timeoutId);
+                            if (error.name === 'AbortError') {
+                                reject(new Error(`Request to ${url} timed out`));
+                            } else {
+                                reject(error);
+                            }
+                        });
+                    });
                 },
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;

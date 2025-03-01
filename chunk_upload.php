@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/upload_helper.php';
 session_start();
 
 // Ensure user is logged in
@@ -10,6 +11,7 @@ if (!isset($_SESSION['user_id'])) {
         'success' => false,
         'error' => 'Login required to upload files'
     ]);
+    logUploadActivity('Upload attempt failed - user not logged in', 'error');
     exit;
 }
 
@@ -17,6 +19,7 @@ if (!isset($_SESSION['user_id'])) {
 set_time_limit(3600);
 ini_set('memory_limit', '512M');
 
+// Always set proper content type for JSON responses
 header('Content-Type: application/json');
 
 try {
@@ -54,6 +57,7 @@ try {
             
             // Return success response
             echo json_encode(['success' => true, 'message' => 'Upload initialized']);
+            logUploadActivity('Upload initialized for fileId: ' . $fileId, 'info');
             exit;
         }
         // For chunk upload request
@@ -78,24 +82,31 @@ try {
                 }
             }
             
-            // Save the chunk
+            // Save the chunk with low-memory approach
             $chunkPath = $tempDir . '/chunk_' . str_pad($chunkIndex, 5, '0', STR_PAD_LEFT);
+            
+            // Use direct move_uploaded_file which is more efficient
             if (!move_uploaded_file($chunk['tmp_name'], $chunkPath)) {
                 throw new Exception('Failed to save chunk: Permission denied or disk full');
             }
             
             echo json_encode([
                 'success' => true,
-                'message' => 'Chunk uploaded successfully'
+                'message' => 'Chunk uploaded successfully',
+                'chunkIndex' => $chunkIndex
             ]);
+            logUploadActivity('Chunk ' . $chunkIndex . ' uploaded for fileId: ' . $fileId, 'info');
             exit;
+        } else {
+            throw new Exception('Invalid request format');
         }
+    } else {
+        throw new Exception('Only POST requests are allowed');
     }
-    
-    throw new Exception('Invalid request method or missing parameters');
     
 } catch (Exception $e) {
     error_log('Chunk upload error: ' . $e->getMessage());
+    logUploadActivity('Chunk upload error: ' . $e->getMessage(), 'error');
     http_response_code(400);
     echo json_encode([
         'success' => false,
