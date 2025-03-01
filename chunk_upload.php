@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 session_start();
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/utils/dropbox_helper.php';
 
 // Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -25,6 +26,15 @@ try {
         if (!$data || !isset($data['action']) || $data['action'] !== 'init' || 
             !isset($data['fileId']) || !isset($data['fileName'])) {
             throw new Exception('Invalid initialization request');
+        }
+        
+        // Check if we have enough storage space before starting
+        if (isset($data['fileSize']) && $data['fileSize'] > 0) {
+            $account = DropboxHelper::getAvailableAccount($data['fileSize']);
+            
+            if (!$account) {
+                throw new Exception('Insufficient storage space for this file size. Please try a smaller file or contact support.');
+            }
         }
         
         // Create temp directory if it doesn't exist

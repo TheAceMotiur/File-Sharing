@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 session_start();
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/utils/dropbox_helper.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -154,24 +155,16 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
         throw new Exception('Cannot access the uploaded file');
     }
     
-    // Get Dropbox credentials with available storage
-    $db = getDBConnection();
-    $dropbox = $db->query("
-        SELECT da.*, 
-               COALESCE(SUM(fu.size), 0) as used_storage
-        FROM dropbox_accounts da
-        LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
-            AND fu.upload_status = 'completed'
-        GROUP BY da.id
-        HAVING used_storage < 2147483648 OR used_storage IS NULL
-        LIMIT 1
-    ")->fetch_assoc();
-
-    if (!$dropbox) {
-        throw new Exception('No Dropbox account with available storage');
-    }
-
     try {
+        // Get an account with sufficient space for this file
+        $db = getDBConnection();
+        $dropbox = DropboxHelper::getAvailableAccount($fileSize);
+
+        if (!$dropbox) {
+            // If no account has enough space, check if we can add a new one
+            throw new Exception('No storage available for this file. Please try a smaller file or contact support.');
+        }
+
         // Initialize Dropbox client with the selected account
         $client = new Spatie\Dropbox\Client($dropbox['access_token']);
         
@@ -181,14 +174,21 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
         // Upload to Dropbox
         $dropboxPath = "/{$fileId}/{$fileName}";
         
-        // For larger files, use file contents instead of loading into memory
-        if ($fileSize > 10 * 1024 * 1024) {  // For files over 10MB
-            $handle = fopen($filePath, 'rb');
-            $client->upload($dropboxPath, $handle, 'add');
-            fclose($handle);
-        } else {
-            $fileContents = file_get_contents($filePath);
-            $client->upload($dropboxPath, $fileContents, 'add');
+        try {
+            // Use our helper method for upload
+            DropboxHelper::uploadFile($filePath, $dropboxPath, $dropbox['access_token']);
+        } catch (Exception $e) {
+            if (strpos($e->getMessage(), 'Insufficient space') !== false) {
+                // Mark this account as full in the database
+                $stmt = $db->prepare("UPDATE dropbox_accounts SET is_full = 1 WHERE id = ?");
+                $stmt->bind_param("i", $dropbox['id']);
+                $stmt->execute();
+                
+                // Try again with a different account (recursive call with safety check)
+                throw new Exception('The selected storage account is full. Please try again or contact support if the problem persists.');
+            } else {
+                throw $e;
+            }
         }
         
         // Delete temporary file if it was created during chunking
@@ -227,8 +227,17 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
         ]);
         exit;
     } catch (Exception $e) {
-        error_log('Dropbox upload error: ' . $e->getMessage());
-        throw new Exception('Failed to upload file to cloud storage: ' . $e->getMessage());
+        error_log('Upload error: ' . $e->getMessage());
+        
+        // Provide user-friendly error messages
+        $errorMsg = $e->getMessage();
+        if (strpos($errorMsg, 'insufficient_space') !== false) {
+            $errorMsg = 'Storage is currently full. Please try again later or contact support.';
+        } elseif (strpos($errorMsg, 'path/conflict') !== false) {
+            $errorMsg = 'A file with this name already exists. Please try again with a different file.';
+        }
+        
+        throw new Exception('Failed to upload file to cloud storage: ' . $errorMsg);
     }
 }
 ?>
