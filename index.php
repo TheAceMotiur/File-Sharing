@@ -134,9 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- Primary Meta Tags -->
-    <title>OneNetly - Fast & Secure File Sharing Platform</title>
-    <meta name="title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta name="description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <title><?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform</title>
+    <meta name="title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
+    <meta name="description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta name="robots" content="index, follow">
     <meta name="language" content="English">
     <meta name="author" content="OneNetly">
@@ -144,15 +144,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="og:title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta property="og:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="og:title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
+    <meta property="og:description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="og:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="twitter:title" content="OneNetly - Fast & Secure File Sharing Platform">
-    <meta property="twitter:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="twitter:title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
+    <meta property="twitter:description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="twitter:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Canonical URL -->
@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "OneNetly",
+        "name": "<?php echo SITE_NAME; ?>",
         "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         },
         "creator": {
             "@type": "Organization",
-            "name": "OneNetly",
+            "name": "<?php echo SITE_NAME; ?>",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -415,7 +415,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- Fast Transfer Feature -->
                     <div class="text-center p-6">
                         <div class="bg-purple-100 rounded-full p-3 inline-flex mx-auto mb-4">
-                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                       d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
