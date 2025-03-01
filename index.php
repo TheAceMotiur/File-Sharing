@@ -78,12 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Upload to Dropbox
                 $db = getDBConnection();
-                
-                // Ensure connection is alive before query
-                if (!$db->ping()) {
-                    $db = getDBConnection(); // Force reconnect
-                }
-                
                 $dropbox = $db->query("
                     SELECT da.*, 
                            COALESCE(SUM(fu.size), 0) as used_storage
@@ -114,12 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 fclose($handle);
 
                 // Save to database
-                
-                // Ensure connection is alive before insert
-                if (!$db->ping()) {
-                    $db = getDBConnection(); // Force reconnect
-                }
-                
                 $stmt = $db->prepare("INSERT INTO file_uploads (
                     file_id, file_name, size, upload_status, dropbox_path, 
                     dropbox_account_id, uploaded_by
@@ -213,12 +201,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Get Dropbox credentials with available storage
         $db = getDBConnection();
-        
-        // Ensure connection is alive before query
-        if (!$db->ping()) {
-            $db = getDBConnection(); // Force reconnect
-        }
-        
         $dropbox = $db->query("
             SELECT da.*, 
                    COALESCE(SUM(fu.size), 0) as used_storage
@@ -246,12 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $client->upload($dropboxPath, $fileContents, 'add');
         
         // Save file info to database with the selected Dropbox account
-        
-        // Ensure connection is alive before insert
-        if (!$db->ping()) {
-            $db = getDBConnection(); // Force reconnect
-        }
-        
         $stmt = $db->prepare("INSERT INTO file_uploads (
             file_id, 
             file_name, 
