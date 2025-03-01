@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "OneNetly",
+        "name": "<?php echo SITE_NAME; ?>",
         "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",

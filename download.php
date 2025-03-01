@@ -478,7 +478,7 @@ try {
                                 </svg>
                             </a>
                             <!-- Twitter/X -->
-                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
+                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-gray-800 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -494,7 +494,7 @@ try {
                                 </svg>
                             </a>
                             <!-- WhatsApp -->
-                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
+                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME . ': ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -502,7 +502,7 @@ try {
                                 </svg>
                             </a>
                             <!-- Telegram -->
-                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
+                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
