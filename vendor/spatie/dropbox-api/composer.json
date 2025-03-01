@@ -32,8 +32,8 @@
     },
     "require-dev": {
         "laravel/pint": "^1.10.1",
-        "pestphp/pest": "^2.6.3",
-        "phpstan/phpstan": "^1.10.16"
+        "phpstan/phpstan": "^1.10.16",
+        "phpunit/phpunit": "^9.4"
     },
     "autoload": {
         "psr-4": {
@@ -42,18 +42,15 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Spatie\\Dropbox\\Tests\\": "tests"
+            "Spatie\\Dropbox\\Test\\": "tests"
         }
     },
     "scripts": {
-        "test": "vendor/bin/pest",
+        "test": "vendor/bin/phpunit",
         "pint": "vendor/bin/pint",
         "phpstan": "vendor/bin/phpstan analyze"
     },
     "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
+        "sort-packages": true
     }
 }

@@ -134,9 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- Primary Meta Tags -->
-    <title><?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform</title>
-    <meta name="title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
-    <meta name="description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <title>OneNetly - Fast & Secure File Sharing Platform</title>
+    <meta name="title" content="OneNetly - Fast & Secure File Sharing Platform">
+    <meta name="description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta name="robots" content="index, follow">
     <meta name="language" content="English">
     <meta name="author" content="OneNetly">
@@ -144,15 +144,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="og:title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
-    <meta property="og:description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="og:title" content="OneNetly - Fast & Secure File Sharing Platform">
+    <meta property="og:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="og:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
-    <meta property="twitter:title" content="<?php echo SITE_NAME; ?> - Fast & Secure File Sharing Platform">
-    <meta property="twitter:description" content="Share files securely with <?php echo SITE_NAME; ?>. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
+    <meta property="twitter:title" content="OneNetly - Fast & Secure File Sharing Platform">
+    <meta property="twitter:description" content="Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.">
     <meta property="twitter:image" content="https://<?php echo $_SERVER['HTTP_HOST']; ?>/icon.png">
 
     <!-- Canonical URL -->
@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "<?php echo SITE_NAME; ?>",
+        "name": "OneNetly",
         "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         },
         "creator": {
             "@type": "Organization",
-            "name": "<?php echo SITE_NAME; ?>",
+            "name": "OneNetly",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -215,14 +215,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
-    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@3.1.0/dist/tus.min.js"></script>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "<?php echo SITE_NAME; ?>",
+        "name": "OneNetly",
         "description": "Share files securely with OneNetly. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
         "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
         "applicationCategory": "File Sharing",
@@ -356,7 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                     </svg>
                                     Copy Link
                                 </button>
@@ -415,7 +414,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <!-- Fast Transfer Feature -->
                     <div class="text-center p-6">
-                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-purple-100">
+                        <div class="bg-purple-100 rounded-full p-3 inline-flex mx-auto mb-4">
                             <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                       d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -481,8 +480,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     uploading: false,
                     progress: 0,
                     downloadLink: '',
-                    showDownloadSection: false,
-                    upload: null
+                    showDownloadSection: false
                 }
             },
             methods: {
@@ -530,72 +528,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     this.uploading = true;
                     this.progress = 0;
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
 
                     try {
                         NProgress.start();
+                        const xhr = new XMLHttpRequest();
                         
-                        // Create a new tus upload
-                        this.upload = new tus.Upload(file, {
-                            endpoint: '/upload.php',
-                            retryDelays: [0, 3000, 5000, 10000, 20000],
-                            metadata: {
-                                filename: file.name,
-                                filetype: file.type
-                            },
-                            onError: (error) => {
-                                console.error('Upload failed:', error);
-                                alert('Upload failed: ' + error.message);
-                                this.uploading = false;
-                                NProgress.done();
-                            },
-                            onProgress: (bytesUploaded, bytesTotal) => {
-                                this.progress = Math.round((bytesUploaded / bytesTotal) * 100);
-                            },
-                            onSuccess: () => {
-                                // Process server response
-                                fetch(this.upload.url, { method: 'POST' })
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            this.downloadLink = data.downloadLink;
-                                            this.showDownloadSection = true;
-                                        } else {
-                                            throw new Error(data.error || 'Upload failed');
-                                        }
-                                    })
-                                    .catch(error => {
-                                        console.error('Upload error:', error);
-                                        alert('Upload failed: ' + error.message);
-                                    })
-                                    .finally(() => {
-                                        this.uploading = false;
-                                        NProgress.done();
-                                    });
+                        // Setup progress tracking
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                this.progress = Math.round((e.loaded * 100) / e.total);
                             }
                         });
 
-                        // Start the upload
-                        this.upload.start();
+                        // Create promise to handle the upload
+                        const uploadPromise = new Promise((resolve, reject) => {
+                            xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    try {
+                                        const response = JSON.parse(xhr.responseText);
+                                        resolve(response);
+                                    } catch (e) {
+                                        reject(new Error('Invalid JSON response'));
+                                    }
+                                } else {
+                                    reject(new Error('Upload failed'));
+                                }
+                            };
+                            xhr.onerror = () => reject(new Error('Network error'));
+                        });
 
+                        // Configure and send request
+                        xhr.open('POST', 'index.php', true);
+                        xhr.send(formData);
+
+                        // Wait for upload to complete
+                        const response = await uploadPromise;
+                        
+                        if (!response.success) {
+                            throw new Error(response.error || 'Upload failed');
+                        }
+                        
+                        this.downloadLink = response.downloadLink;
+                        this.showDownloadSection = true;
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
+                    } finally {
                         this.uploading = false;
                         NProgress.done();
                     }
                 },
-
-                // Add method to pause/resume upload
-                toggleUpload() {
-                    if (!this.upload) return;
-
-                    if (this.upload.isRunning()) {
-                        this.upload.abort();
-                    } else {
-                        this.upload.start();
-                    }
-                },
-
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;

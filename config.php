@@ -6,8 +6,6 @@ ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
 ini_set('session.cookie_secure', 1);
 ini_set('session.cookie_httponly', 1);
 
-// Site configuration
-define('SITE_NAME', 'FilesWith');
 define('RECAPTCHA_SITE_KEY', '6LfEK8oqAAAAAA4X-xursRqDCIMD4AxPyWjyeIEw');
 define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
 
@@ -16,8 +14,8 @@ function getDBConnection() {
     
     if ($db === null) {
         $host = 'localhost';
-        $dbname = 'TheAceMotiur_fileswith';
-        $username = 'TheAceMotiur_fileswith';
+        $dbname = 'onenetly_home';
+        $username = 'onenetly_home';
         $password = 'AmiMotiur27@';
 
         try {

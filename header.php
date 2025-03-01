@@ -3,18 +3,16 @@
         <!-- Main Content -->
         <div class="flex-1">
             <!-- Top Navigation Bar -->
-            <nav class="bg-white shadow">
+            <div class="bg-white shadow-sm">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex justify-between h-16">
                         <div class="flex">                           
                             <!-- Logo -->
                             <div class="flex-shrink-0 flex items-center">
-                                <a href="/" class="text-xl font-bold text-blue-600">
-                                    <?php echo SITE_NAME; ?>
-                                </a>
+                                <a href="/" class="text-xl font-bold text-gray-800">OneNetly</a>
                             </div>
                         </div>
- 
+
                         <!-- Right Navigation -->
                         <div class="flex items-center space-x-4">
                             <?php if (isset($_SESSION['user_id'])): ?>
@@ -70,4 +68,4 @@
                         </div>
                     </div>
                 </div>
-            </nav>
+            </div>

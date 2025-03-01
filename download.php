@@ -218,8 +218,8 @@ try {
     
     <?php
     // Generate SEO-friendly title and description
-    $pageTitle = "Download " . $fileName . " - " . SITE_NAME . " Secure File Sharing";
-    $pageDescription = "Download " . $fileName . " securely via " . SITE_NAME . ". File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
+    $pageTitle = "Download " . $fileName . " - OneNetly Secure File Sharing";
+    $pageDescription = "Download " . $fileName . " securely via OneNetly. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
     $canonicalUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
     
     // Determine if file is an image and set preview URL
@@ -285,7 +285,7 @@ try {
         },
         "publisher": {
             "@type": "Organization",
-            "name": "<?php echo SITE_NAME; ?>",
+            "name": "OneNetly",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -299,7 +299,7 @@ try {
         "itemListElement": [{
             "@type": "ListItem",
             "position": 1,
-            "name": "<?php echo SITE_NAME; ?>",
+            "name": "OneNetly",
             "item": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         },
         {
@@ -478,7 +478,7 @@ try {
                                 </svg>
                             </a>
                             <!-- Twitter/X -->
-                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME); ?>" 
+                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-gray-800 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -494,7 +494,7 @@ try {
                                 </svg>
                             </a>
                             <!-- WhatsApp -->
-                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME . ': ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
+                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -502,7 +502,7 @@ try {
                                 </svg>
                             </a>
                             <!-- Telegram -->
-                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via ' . SITE_NAME); ?>" 
+                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
