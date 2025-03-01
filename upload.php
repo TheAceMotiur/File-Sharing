@@ -1,4 +1,5 @@
 <?php
+header('Content-Type: application/json');
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
 session_start();
@@ -12,6 +13,15 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
+    if (!isset($_FILES['file'])) {
+        throw new Exception('No file uploaded');
+    }
+
+    $upload = $_FILES['file'];
+    if ($upload['error'] !== UPLOAD_ERR_OK) {
+        throw new Exception('Upload failed with error code: ' . $upload['error']);
+    }
+
     $server = new Server('file');
     $server->setUploadDir(__DIR__ . '/uploads');
 
@@ -87,11 +97,18 @@ try {
     $response = $server->serve();
     $response->send();
 
+    // Send success response
+    echo json_encode([
+        'success' => true,
+        'message' => 'File uploaded successfully',
+        'fileId' => $fileId
+    ]);
+
 } catch (Exception $e) {
-    error_log("Server error: " . $e->getMessage());
-    http_response_code(500);
+    http_response_code(400);
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'message' => $e->getMessage()
     ]);
 }
+?>
