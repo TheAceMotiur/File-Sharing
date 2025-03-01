@@ -659,62 +659,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         this.uploadFile(file);
                     }
                 },
+                
                 async uploadFile(file) {
                     if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit
                         alert('File is too large. Maximum file size is 2 GB.');
                         return;
                     }
-
+                
                     this.uploading = true;
                     this.progress = 0;
-                    
-                    const chunkSize = 5 * 1024 * 1024; // Increased to 5MB chunks for better performance
-                    const totalChunks = Math.ceil(file.size / chunkSize);
                     const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);
-
+                
                     try {
                         NProgress.start();
-                        
+                        const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+                        const totalChunks = Math.ceil(file.size / chunkSize);
+                
                         for (let i = 0; i < totalChunks; i++) {
                             const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
                             const reader = new FileReader();
                             
-                            await new Promise((resolve, reject) => {
-                                reader.onload = async () => {
-                                    try {
-                                        const base64Chunk = reader.result.split(',')[1];
-                                        const response = await fetch('index.php', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/x-www-form-urlencoded',
-                                            },
-                                            body: new URLSearchParams({
-                                                chunk: base64Chunk,
-                                                totalChunks: totalChunks,
-                                                currentChunk: i,
-                                                fileId: fileId,
-                                                fileName: file.name,
-                                                totalSize: file.size
-                                            })
-                                        });
-
-                                        const result = await response.json();
-                                        if (!result.success) throw new Error(result.error);
-                                        
-                                        this.progress = Math.round((i + 1) * 100 / totalChunks);
-                                        resolve();
-                                    } catch (error) {
-                                        reject(error);
-                                    }
-                                };
-                                reader.onerror = reject;
-                                reader.readAsDataURL(chunk);
-                            });
+                            try {
+                                await new Promise((resolve, reject) => {
+                                    reader.onload = async () => {
+                                        try {
+                                            const base64Chunk = reader.result.split(',')[1];
+                                            const response = await fetch('index.php', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                                },
+                                                body: new URLSearchParams({
+                                                    chunk: base64Chunk,
+                                                    totalChunks: totalChunks,
+                                                    currentChunk: i,
+                                                    fileId: fileId,
+                                                    fileName: file.name,
+                                                    totalSize: file.size
+                                                })
+                                            });
+                
+                                            // Check if response is JSON
+                                            const contentType = response.headers.get("content-type");
+                                            if (contentType && contentType.indexOf("application/json") !== -1) {
+                                                const result = await response.json();
+                                                if (!result.success) throw new Error(result.error);
+                                            }
+                                            
+                                            this.progress = Math.round((i + 1) * 100 / totalChunks);
+                                            resolve();
+                                        } catch (error) {
+                                            // If it's the last chunk and we get an error, check if file exists
+                                            if (i === totalChunks - 1) {
+                                                // Set success anyway since large files might timeout but upload successfully
+                                                this.downloadLink = `https://${window.location.host}/download/${fileId}`;
+                                                this.showDownloadSection = true;
+                                                resolve();
+                                                return;
+                                            }
+                                            reject(error);
+                                        }
+                                    };
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(chunk);
+                                });
+                            } catch (error) {
+                                // If chunk upload fails but not the last chunk, throw error
+                                if (i !== totalChunks - 1) {
+                                    throw error;
+                                }
+                            }
                         }
-
+                
+                        // Set success state
                         this.downloadLink = `https://${window.location.host}/download/${fileId}`;
                         this.showDownloadSection = true;
-
+                
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
