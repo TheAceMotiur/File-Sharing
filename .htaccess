@@ -18,6 +18,19 @@ RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L]
     php_value max_input_time 3600
 </IfModule>
 
+# Increase timeout for large uploads
+php_value max_execution_time 0
+php_value max_input_time -1
+php_value upload_max_filesize 2G
+php_value post_max_size 2G
+php_value memory_limit 256M
+
+# Enable compression
+<IfModule mod_deflate.c>
+    SetOutputFilter DEFLATE
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml application/json
+</IfModule>
+
 # Remove .php extension
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}.php -f

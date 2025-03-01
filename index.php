@@ -672,7 +672,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                     try {
                         NProgress.start();
-                        const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+                        const chunkSize = 2 * 1024 * 1024; // 2MB chunks
                         const totalChunks = Math.ceil(file.size / chunkSize);
                 
                         for (let i = 0; i < totalChunks; i++) {
