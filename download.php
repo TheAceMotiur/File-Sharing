@@ -218,8 +218,8 @@ try {
     
     <?php
     // Generate SEO-friendly title and description
-    $pageTitle = "Download " . $fileName . " - OneNetly Secure File Sharing";
-    $pageDescription = "Download " . $fileName . " securely via OneNetly. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
+    $pageTitle = "Download " . $fileName . " - " . SITE_NAME . " Secure File Sharing";
+    $pageDescription = "Download " . $fileName . " securely via " . SITE_NAME . ". File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
     $canonicalUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
     
     // Determine if file is an image and set preview URL
@@ -285,7 +285,7 @@ try {
         },
         "publisher": {
             "@type": "Organization",
-            "name": "OneNetly",
+            "name": "<?php echo SITE_NAME; ?>",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -299,7 +299,7 @@ try {
         "itemListElement": [{
             "@type": "ListItem",
             "position": 1,
-            "name": "OneNetly",
+            "name": "<?php echo SITE_NAME; ?>",
             "item": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         },
         {
