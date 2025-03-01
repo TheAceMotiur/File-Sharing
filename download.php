@@ -4,13 +4,6 @@ session_start();
 require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
-// Initialize default values for variables that might not be set
-$fileName = 'unknown-file';
-$fileSize = 0;
-$fileId = '';
-$error = null;
-$statusCode = null;
-
 function getFileFromCache($fileId) {
     $cacheDir = __DIR__ . '/cache';
     $cachePath = $cacheDir . '/' . $fileId;
@@ -57,7 +50,7 @@ function incrementDownloadCount($fileId) {
 // Function to add watermark to file name
 function addWatermark($fileName) {
     $info = pathinfo($fileName);
-    return $info['filename'] . '-[FILESWITH.COM].' . $info['extension'];
+    return $info['filename'] . '-[OneNetly.COM].' . $info['extension'];
 }
 
 function isImageFile($fileName) {
@@ -70,7 +63,7 @@ try {
     $db = getDBConnection();
 
     // Validate file ID
-    $fileId = isset($_GET['id']) ? $_GET['id'] : '';
+    $fileId = $_GET['id'] ?? '';
 
     // Validate file ID first
     if (empty($fileId)) {
@@ -87,10 +80,6 @@ try {
             if (!$file) {
                 $error = "File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.";
                 $statusCode = 404;
-            } else {
-                // Set these values as soon as we have the file data
-                $fileName = htmlspecialchars($file['file_name']);
-                $fileSize = number_format($file['size'] / 1024 / 1024, 2);
             }
         } catch (Exception $e) {
             $error = "Error retrieving file";
@@ -104,7 +93,7 @@ try {
     }
 
     // Check if this is a download request
-    if (isset($_GET['download']) && !$error) {
+    if (isset($_GET['download'])) {
         try {
             // Check cache first
             $cachePath = getFileFromCache($fileId);
@@ -136,9 +125,12 @@ try {
             if (!$dropbox) {
                 throw new Exception("Could not find associated Dropbox account");
             }
-            
-            // Already have file info from earlier query, no need to query again
-            if (!isset($file) || !$file) {
+            $stmt = $db->prepare("SELECT file_name FROM file_uploads WHERE file_id = ?");
+            $stmt->bind_param("s", $fileId);
+            $stmt->execute();
+            $file = $stmt->get_result()->fetch_assoc();
+
+            if (!$file) {
                 throw new Exception("File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.");
             }
 
@@ -180,57 +172,40 @@ try {
         }
     }
 
-    // If we reach here without $file being set but no error, we should fetch file data
-    if (!isset($file) && !$error) {
-        try {
-            $stmt = $db->prepare("SELECT * FROM file_uploads WHERE file_id = ? AND upload_status = 'completed'");
-            $stmt->bind_param("s", $fileId);
-            $stmt->execute();
-            $file = $stmt->get_result()->fetch_assoc();
+    // Get file info
+    $stmt = $db->prepare("SELECT * FROM file_uploads WHERE file_id = ? AND upload_status = 'completed'");
+    $stmt->bind_param("s", $fileId);
+    $stmt->execute();
+    $file = $stmt->get_result()->fetch_assoc();
 
-            if ($file) {
-                $fileName = htmlspecialchars($file['file_name']);
-                $fileSize = number_format($file['size'] / 1024 / 1024, 2);
-
-                // Update last download and expires 
-                $stmt = $db->prepare("UPDATE file_uploads SET 
-                    last_download_at = CURRENT_TIMESTAMP,
-                    expires_at = CURRENT_TIMESTAMP + INTERVAL 180 DAY 
-                    WHERE file_id = ?");
-                $stmt->bind_param("s", $fileId);
-                $stmt->execute();
-            } else {
-                $error = "File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.";
-            }
-        } catch (Exception $e) {
-            $error = $e->getMessage();
-        }
+    if (!$file) {
+        throw new Exception("File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.");
     }
 
-    // Create direct download URL
+    // Get Dropbox temporary link
+    $stmt = $db->prepare("UPDATE file_uploads SET 
+        last_download_at = CURRENT_TIMESTAMP,
+        expires_at = CURRENT_TIMESTAMP + INTERVAL 180 DAY 
+        WHERE file_id = ?");
+    $stmt->bind_param("s", $fileId);
+    $stmt->execute();
+
+    // Instead of getting Dropbox temporary link, create direct download URL
     $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
-    $downloadUrl = $directDownloadUrl;
+    $downloadUrl = $directDownloadUrl; // Use direct download URL instead of Dropbox temporary link
+
+    $fileName = htmlspecialchars($file['file_name']);
+    $fileSize = number_format($file['size'] / 1024 / 1024, 2);
+
+    // Handle preview requests directly
+    if (isset($_GET['preview']) && isImageFile($fileName)) {
+        header('Location: ' . $directDownloadUrl);
+        exit;
+    }
 
 } catch (Exception $e) {
     // Set error variable instead of using die()
     $error = $e->getMessage();
-}
-
-// Fixed function to safely check mime type
-function safeGetMimeType($fileName) {
-    // Use a default mime type if we can't determine it
-    $defaultMimeType = 'application/octet-stream';
-    
-    try {
-        // Only attempt to get mime_content_type if file actually exists
-        if (file_exists($fileName)) {
-            return mime_content_type($fileName);
-        }
-    } catch (Exception $e) {
-        // Just return default if any error
-    }
-    
-    return $defaultMimeType;
 }
 ?>
 
@@ -243,12 +218,13 @@ function safeGetMimeType($fileName) {
     
     <?php
     // Generate SEO-friendly title and description
-    $pageTitle = "Download " . $fileName . " - FilesWith Secure File Sharing";
-    $pageDescription = "Download " . $fileName . " securely via FilesWith. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
+    $pageTitle = "Download " . $fileName . " - OneNetly Secure File Sharing";
+    $pageDescription = "Download " . $fileName . " securely via OneNetly. File size: " . $fileSize . "MB. Our platform ensures safe and encrypted file transfers with cloud storage capabilities.";
     $canonicalUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
     
     // Determine if file is an image and set preview URL
     $isImage = isImageFile($fileName);
+    $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
     $previewImage = $isImage ? $directDownloadUrl : "https://" . $_SERVER['HTTP_HOST'] . "/icon.png";
     ?>
     
@@ -259,7 +235,7 @@ function safeGetMimeType($fileName) {
     <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl); ?>">
     <meta name="robots" content="noindex, nofollow, max-image-preview:large">
     <meta name="language" content="English">
-    <meta name="author" content="FilesWith">
+    <meta name="author" content="OneNetly">
     <meta name="theme-color" content="#2563eb">
 
     <!-- Open Graph / Facebook -->
@@ -269,12 +245,12 @@ function safeGetMimeType($fileName) {
     <meta property="og:description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <meta property="og:image" content="<?php echo htmlspecialchars($previewImage); ?>">
     <?php if ($isImage): ?>
-    <meta property="og:image:type" content="<?php echo safeGetMimeType($fileName); ?>">
+    <meta property="og:image:type" content="<?php echo mime_content_type($fileName); ?>">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Preview of <?php echo htmlspecialchars($fileName); ?>">
     <?php endif; ?>
-    <meta property="og:site_name" content="FilesWith">
+    <meta property="og:site_name" content="OneNetly">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="<?php echo $isImage ? 'summary_large_image' : 'summary'; ?>">
@@ -290,8 +266,8 @@ function safeGetMimeType($fileName) {
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="FilesWith">
-    <meta name="apple-mobile-web-app-title" content="FilesWith">
+    <meta name="application-name" content="OneNetly">
+    <meta name="apple-mobile-web-app-title" content="OneNetly">
 
     <!-- JSON-LD Structured Data with more details -->
     <script type="application/ld+json">
@@ -304,12 +280,12 @@ function safeGetMimeType($fileName) {
             "@type": "DigitalDocument",
             "name": "<?php echo htmlspecialchars($fileName); ?>",
             "fileFormat": "<?php echo pathinfo($fileName, PATHINFO_EXTENSION); ?>",
-            "dateModified": "<?php echo isset($file['last_download_at']) ? $file['last_download_at'] : ''; ?>",
+            "dateModified": "<?php echo $file['last_download_at'] ?? ''; ?>",
             "contentSize": "<?php echo $fileSize; ?> MB"
         },
         "publisher": {
             "@type": "Organization",
-            "name": "FilesWith",
+            "name": "OneNetly",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
@@ -323,7 +299,7 @@ function safeGetMimeType($fileName) {
         "itemListElement": [{
             "@type": "ListItem",
             "position": 1,
-            "name": "FilesWith",
+            "name": "OneNetly",
             "item": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         },
         {
@@ -400,6 +376,7 @@ function safeGetMimeType($fileName) {
                         <p class="font-medium text-gray-900"><?php echo $fileName; ?></p>
                         <p class="text-sm text-gray-500 mt-2">Size: <?php echo $fileSize; ?> MB</p>
                     </div>
+
                 </div>
 
                 <!-- Action Buttons -->
@@ -416,7 +393,7 @@ function safeGetMimeType($fileName) {
                 
                     <!-- Download Button -->
                     <div class="flex justify-center">
-                        <a href="https://fileswith.com/wait.php?link=https://fileswith.com/download/<?php echo urlencode($fileId); ?>/download"
+                        <a href="https://onenetly.com/wait.php?link=https://onenetly.com/download/<?php echo urlencode($fileId); ?>/download"
                            class="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
                             <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -501,7 +478,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- Twitter/X -->
-                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith'); ?>" 
+                            <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-gray-800 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -517,7 +494,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- WhatsApp -->
-                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
+                            <a href="https://wa.me/?text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly: ' . 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -525,7 +502,7 @@ function safeGetMimeType($fileName) {
                                 </svg>
                             </a>
                             <!-- Telegram -->
-                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via FilesWith'); ?>" 
+                            <a href="https://t.me/share/url?url=<?php echo urlencode('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>&text=<?php echo urlencode('Download ' . $fileName . ' via OneNetly'); ?>" 
                                target="_blank"
                                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">

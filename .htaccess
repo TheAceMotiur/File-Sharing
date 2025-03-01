@@ -30,7 +30,7 @@ RewriteRule ^([^/]+)/?$ $1.php [L]
 
 # Add CORS headers
 Header set Access-Control-Allow-Origin "*"
-Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+Header set Access-Control-Allow-Methods "GET, OPTIONS"
 Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, X-File-Name"
 
 # Additional headers for proxy support

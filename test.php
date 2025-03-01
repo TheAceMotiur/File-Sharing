@@ -1,5 +1,5 @@
 <?php
-$API_URL = 'https://fileswith.com/api.php';
+$API_URL = 'https://onenetly.com/api.php';
 $API_KEY = '59d144a41422d3f7881fefdae6ffd53b020264f57a5c7da10bd1345bb54e6fb1';
 
 function makeRequest($url, $apiKey, $method = 'GET', $data = null) {
@@ -179,7 +179,7 @@ $files = $result['body']['data']['files'] ?? [];
                                         <?php echo $file['created_at']; ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap space-x-3">
-                                        <a href="https://fileswith.com/download/<?php echo $file['file_id']; ?>" 
+                                        <a href="https://onenetly.com/download/<?php echo $file['file_id']; ?>" 
                                            class="text-blue-600 hover:text-blue-900 inline-block">
                                             Download
                                         </a>

@@ -7,7 +7,7 @@ session_start();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terms of Service - FilesWith</title>
+    <title>Terms of Service - OneNetly</title>
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -20,7 +20,7 @@ session_start();
         <div class="bg-white rounded-lg shadow-sm p-6 space-y-6">
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">1. Acceptance of Terms</h2>
-                <p class="text-gray-600">By accessing and using FilesWith, you accept and agree to be bound by the terms and provision of this agreement.</p>
+                <p class="text-gray-600">By accessing and using OneNetly, you accept and agree to be bound by the terms and provision of this agreement.</p>
             </section>
 
             <section>
@@ -60,7 +60,7 @@ session_start();
 
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">6. Privacy</h2>
-                <p class="text-gray-600">Your use of FilesWith is also governed by our <a href="privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</p>
+                <p class="text-gray-600">Your use of OneNetly is also governed by our <a href="privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.</p>
             </section>
 
             <section>

@@ -3,8 +3,8 @@ require_once __DIR__ . '/config.php';
 session_start();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password = isset($_POST['password']) ? $_POST['password'] : '';
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
     $remember = isset($_POST['remember']);
 
     if (empty($email) || empty($password)) {
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'path' => $params['path'],
                             'domain' => $params['domain'],
                             'httponly' => true,
-                            'secure' => isset($_SERVER['HTTPS']),
+                            'secure' => false,
                             'samesite' => 'Lax'
                         ]);
 
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - FilesWith</title>
+    <title>Login - OneNetly</title>
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>

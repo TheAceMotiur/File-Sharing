@@ -7,7 +7,7 @@ session_start();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DMCA Policy - FilesWith</title>
+    <title>DMCA Policy - OneNetly</title>
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -20,7 +20,7 @@ session_start();
         <div class="bg-white rounded-lg shadow-sm p-6 space-y-6">
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">1. Digital Millennium Copyright Act</h2>
-                <p class="text-gray-600">FilesWith respects the intellectual property rights of others and expects its users to do the same. In accordance with the Digital Millennium Copyright Act of 1998 ("DMCA"), we will respond expeditiously to claims of copyright infringement that are reported to our designated copyright agent.</p>
+                <p class="text-gray-600">OneNetly respects the intellectual property rights of others and expects its users to do the same. In accordance with the Digital Millennium Copyright Act of 1998 ("DMCA"), we will respond expeditiously to claims of copyright infringement that are reported to our designated copyright agent.</p>
             </section>
 
             <section>
@@ -40,8 +40,8 @@ session_start();
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">3. Filing a DMCA Notice</h2>
                 <p class="text-gray-600 mb-4">Send your DMCA notice to our designated copyright agent:</p>
                 <div class="bg-gray-50 rounded-lg p-4">
-                    <p class="text-gray-600">Copyright Agent - FilesWith</p>
-                    <p class="text-gray-600">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'copyright@FilesWith.com'); ?></p>
+                    <p class="text-gray-600">Copyright Agent - OneNetly</p>
+                    <p class="text-gray-600">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'copyright@OneNetly.com'); ?></p>
                 </div>
             </section>
 
@@ -58,18 +58,18 @@ session_start();
 
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">5. Repeat Infringers</h2>
-                <p class="text-gray-600">FilesWith maintains a policy of terminating accounts of users who are repeat copyright infringers. We reserve the right to terminate accounts of users who have multiple DMCA complaints filed against them.</p>
+                <p class="text-gray-600">OneNetly maintains a policy of terminating accounts of users who are repeat copyright infringers. We reserve the right to terminate accounts of users who have multiple DMCA complaints filed against them.</p>
             </section>
 
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">6. Modifications</h2>
-                <p class="text-gray-600">FilesWith reserves the right to update this DMCA policy at any time. Users will be notified of any changes through our website.</p>
+                <p class="text-gray-600">OneNetly reserves the right to update this DMCA policy at any time. Users will be notified of any changes through our website.</p>
             </section>
 
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">7. Contact Information</h2>
                 <p class="text-gray-600">For any questions regarding this DMCA policy, please contact us at:</p>
-                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@FilesWith.com'); ?></p>
+                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@onenetly.com'); ?></p>
             </section>
         </div>
 
@@ -77,7 +77,7 @@ session_start();
             Last updated: <?php echo date('F d, Y'); ?>
         </div>
     </div>
- 
+
     <?php include 'footer.php'; ?>
 </body>
 </html>
