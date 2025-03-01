@@ -14,7 +14,7 @@
                                 </a>
                             </div>
                         </div>
-
+ 
                         <!-- Right Navigation -->
                         <div class="flex items-center space-x-4">
                             <?php if (isset($_SESSION['user_id'])): ?>
