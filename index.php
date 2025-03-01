@@ -215,6 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
+    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@3.1.0/dist/tus.min.js"></script>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -480,7 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     uploading: false,
                     progress: 0,
                     downloadLink: '',
-                    showDownloadSection: false
+                    showDownloadSection: false,
+                    upload: null
                 }
             },
             methods: {
@@ -528,59 +530,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     this.uploading = true;
                     this.progress = 0;
-                    
-                    const formData = new FormData();
-                    formData.append('file', file);
 
                     try {
                         NProgress.start();
-                        const xhr = new XMLHttpRequest();
                         
-                        // Setup progress tracking
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                this.progress = Math.round((e.loaded * 100) / e.total);
+                        // Create a new tus upload
+                        this.upload = new tus.Upload(file, {
+                            endpoint: '/upload.php',
+                            retryDelays: [0, 3000, 5000, 10000, 20000],
+                            metadata: {
+                                filename: file.name,
+                                filetype: file.type
+                            },
+                            onError: (error) => {
+                                console.error('Upload failed:', error);
+                                alert('Upload failed: ' + error.message);
+                                this.uploading = false;
+                                NProgress.done();
+                            },
+                            onProgress: (bytesUploaded, bytesTotal) => {
+                                this.progress = Math.round((bytesUploaded / bytesTotal) * 100);
+                            },
+                            onSuccess: () => {
+                                // Process server response
+                                fetch(this.upload.url, { method: 'POST' })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.downloadLink = data.downloadLink;
+                                            this.showDownloadSection = true;
+                                        } else {
+                                            throw new Error(data.error || 'Upload failed');
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Upload error:', error);
+                                        alert('Upload failed: ' + error.message);
+                                    })
+                                    .finally(() => {
+                                        this.uploading = false;
+                                        NProgress.done();
+                                    });
                             }
                         });
 
-                        // Create promise to handle the upload
-                        const uploadPromise = new Promise((resolve, reject) => {
-                            xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                    try {
-                                        const response = JSON.parse(xhr.responseText);
-                                        resolve(response);
-                                    } catch (e) {
-                                        reject(new Error('Invalid JSON response'));
-                                    }
-                                } else {
-                                    reject(new Error('Upload failed'));
-                                }
-                            };
-                            xhr.onerror = () => reject(new Error('Network error'));
-                        });
+                        // Start the upload
+                        this.upload.start();
 
-                        // Configure and send request
-                        xhr.open('POST', 'index.php', true);
-                        xhr.send(formData);
-
-                        // Wait for upload to complete
-                        const response = await uploadPromise;
-                        
-                        if (!response.success) {
-                            throw new Error(response.error || 'Upload failed');
-                        }
-                        
-                        this.downloadLink = response.downloadLink;
-                        this.showDownloadSection = true;
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
-                    } finally {
                         this.uploading = false;
                         NProgress.done();
                     }
                 },
+
+                // Add method to pause/resume upload
+                toggleUpload() {
+                    if (!this.upload) return;
+
+                    if (this.upload.isRunning()) {
+                        this.upload.abort();
+                    } else {
+                        this.upload.start();
+                    }
+                },
+
                 copyDownloadLink() {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
