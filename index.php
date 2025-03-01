@@ -15,14 +15,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         exit;
     }
-
+    
     header('Content-Type: application/json');
     try {
         // Handling regular file upload
         if (isset($_FILES['file'])) {
             $file = $_FILES['file'];
             if ($file['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception('File upload failed');
+                $errorMessages = [
+                    UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive in php.ini',
+                    UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form',
+                    UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded',
+                    UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+                    UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder',
+                    UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                    UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+                ];
+                throw new Exception('File upload failed: ' . 
+                    ($errorMessages[$file['error']] ?? 'Unknown error code: ' . $file['error']));
             }
 
             // Add allowed file types
@@ -61,9 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } 
         // Handling chunked upload completion
         elseif (isset($_POST['fileId']) && isset($_POST['fileName']) && isset($_POST['totalSize']) && isset($_POST['chunksComplete'])) {
-            $tempDir = __DIR__ . '/temp/' . $_POST['fileId'];
+            $fileId = $_POST['fileId'];
+            $tempDir = __DIR__ . '/temp/' . $fileId;
             $fileName = $_POST['fileName'];
             $totalSize = (int)$_POST['totalSize'];
+            
+            if (!is_dir($tempDir)) {
+                throw new Exception('Upload session not found. Please try again.');
+            }
             
             // Verify all chunks are complete
             if ($_POST['chunksComplete'] !== "true") {
@@ -73,32 +88,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Combine chunks into a single file
             $outputFile = $tempDir . '/complete_' . $fileName;
             $chunks = glob($tempDir . '/chunk_*');
-            sort($chunks, SORT_NATURAL); // Sort chunks in natural order
             
-            if (count($chunks) === 0) {
-                throw new Exception('No chunks found');
+            if (empty($chunks)) {
+                throw new Exception('No chunks found for this upload');
             }
+            
+            // Sort chunks in natural order to ensure correct file assembly
+            sort($chunks, SORT_NATURAL);
             
             // Create the final file
             $finalFile = fopen($outputFile, 'wb');
+            if (!$finalFile) {
+                throw new Exception('Failed to create output file');
+            }
+            
             foreach ($chunks as $chunk) {
                 $chunkContent = file_get_contents($chunk);
-                fwrite($finalFile, $chunkContent);
+                if ($chunkContent === false) {
+                    fclose($finalFile);
+                    throw new Exception('Failed to read chunk: ' . $chunk);
+                }
+                
+                if (fwrite($finalFile, $chunkContent) === false) {
+                    fclose($finalFile);
+                    throw new Exception('Failed to write to output file');
+                }
+                
                 unlink($chunk); // Remove the chunk after appending
             }
             fclose($finalFile);
+            
+            // Update session status
+            $db = getDBConnection();
+            $stmt = $db->prepare("UPDATE upload_sessions SET status = 'completed' WHERE file_id = ?");
+            $stmt->bind_param("s", $fileId);
+            $stmt->execute();
             
             // Process the complete file
             completeUpload($outputFile, $fileName, $totalSize, true);
             
             // Clean up temp directory
-            rmdir($tempDir);
+            if (file_exists($tempDir) && is_dir($tempDir)) {
+                rmdir($tempDir);
+            }
         }
         // Handling chunk upload - moved to a separate endpoint (chunk_upload.php)
         else {
-            throw new Exception('No file uploaded');
+            throw new Exception('No file uploaded or invalid upload request');
         }
     } catch (Exception $e) {
+        error_log('Upload error: ' . $e->getMessage());
         http_response_code(400);
         echo json_encode([
             'success' => false,
@@ -110,7 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Function to complete the upload process
 function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
-    global $db;
+    // Check if file exists and is readable
+    if (!file_exists($filePath) || !is_readable($filePath)) {
+        throw new Exception('Cannot access the uploaded file');
+    }
     
     // Get Dropbox credentials with available storage
     $db = getDBConnection();
@@ -129,54 +171,68 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
         throw new Exception('No Dropbox account with available storage');
     }
 
-    // Initialize Dropbox client with the selected account
-    $client = new Spatie\Dropbox\Client($dropbox['access_token']);
-    
-    // Generate unique file ID
-    $fileId = uniqid();
-    
-    // Upload to Dropbox
-    $dropboxPath = "/{$fileId}/{$fileName}";
-    $fileContents = file_get_contents($filePath);
-    $client->upload($dropboxPath, $fileContents, 'add');
-    
-    // Delete temporary file if it was created during chunking
-    if ($isTemporary) {
-        unlink($filePath);
-    }
-    
-    // Save file info to database with the selected Dropbox account
-    $stmt = $db->prepare("INSERT INTO file_uploads (
-        file_id, 
-        file_name, 
-        size, 
-        upload_status, 
-        dropbox_path, 
-        dropbox_account_id, 
-        uploaded_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    
-    $status = 'completed';
-    $stmt->bind_param("ssissii", 
-        $fileId,
-        $fileName,
-        $fileSize,
-        $status,
-        $dropboxPath,
-        $dropbox['id'],
-        $_SESSION['user_id']
-    );
-    $stmt->execute();
+    try {
+        // Initialize Dropbox client with the selected account
+        $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+        
+        // Generate unique file ID
+        $fileId = uniqid();
+        
+        // Upload to Dropbox
+        $dropboxPath = "/{$fileId}/{$fileName}";
+        
+        // For larger files, use file contents instead of loading into memory
+        if ($fileSize > 10 * 1024 * 1024) {  // For files over 10MB
+            $handle = fopen($filePath, 'rb');
+            $client->upload($dropboxPath, $handle, 'add');
+            fclose($handle);
+        } else {
+            $fileContents = file_get_contents($filePath);
+            $client->upload($dropboxPath, $fileContents, 'add');
+        }
+        
+        // Delete temporary file if it was created during chunking
+        if ($isTemporary && file_exists($filePath)) {
+            unlink($filePath);
+        }
+        
+        // Save file info to database with the selected Dropbox account
+        $stmt = $db->prepare("INSERT INTO file_uploads (
+            file_id, 
+            file_name, 
+            size, 
+            upload_status, 
+            dropbox_path, 
+            dropbox_account_id, 
+            uploaded_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        
+        $status = 'completed';
+        $stmt->bind_param("ssissii", 
+            $fileId,
+            $fileName,
+            $fileSize,
+            $status,
+            $dropboxPath,
+            $dropbox['id'],
+            $_SESSION['user_id']
+        );
+        $stmt->execute();
 
-    $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;        
-    
-    echo json_encode([
-        'success' => true,
-        'downloadLink' => $downloadLink
-    ]);
-    exit;
+        $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;        
+        
+        echo json_encode([
+            'success' => true,
+            'downloadLink' => $downloadLink
+        ]);
+        exit;
+    } catch (Exception $e) {
+        error_log('Dropbox upload error: ' . $e->getMessage());
+        throw new Exception('Failed to upload file to cloud storage: ' . $e->getMessage());
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -207,6 +263,16 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
 
     <!-- Canonical URL -->
     <link rel="canonical" href="https://<?php echo $_SERVER['HTTP_HOST']; ?>">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+    
+    <!-- Resources -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -255,41 +321,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
         }]
     }
     </script>
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="icon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
-    
-    <!-- Resources -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
-
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "FilesWith",
-        "description": "Share files securely with FilesWith. Upload and share files with anyone, anywhere with end-to-end encryption and cloud storage capabilities.",
-        "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>",
-        "applicationCategory": "File Sharing",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-        },
-        "featureList": [
-            "Secure file sharing",
-            "Cloud storage",
-            "Fast transfer speeds",
-            "End-to-end encryption"
-        ],
-        "operatingSystem": "All"
-    }
-    </script>
-
 </head>
 <body class="bg-gray-50">
 <?php include 'header.php'; ?>
@@ -571,7 +602,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             alert('File type not allowed. Only media and archive files are supported.');
                             return;
                         }
-                        
                         this.uploadFile(file);
                     }
                 },
@@ -596,7 +626,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             // For larger files, use chunked upload
                             await this.chunkedUpload(file);
                         }
-                        
                     } catch (error) {
                         console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
@@ -609,7 +638,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                 async regularUpload(file) {
                     const formData = new FormData();
                     formData.append('file', file);
-                    
                     const xhr = new XMLHttpRequest();
                     
                     // Setup progress tracking
@@ -634,6 +662,7 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             }
                         };
                         xhr.onerror = () => reject(new Error('Network error'));
+                        xhr.onabort = () => reject(new Error('Upload was aborted'));
                     });
                     
                     // Configure and send request
@@ -675,7 +704,7 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             }),
                             timeout: 10000 // 10 second timeout
                         });
-                        
+
                         // Process response
                         let initData;
                         try {
@@ -684,11 +713,11 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             console.error('Failed to parse init response as JSON', e);
                             throw new Error('Server returned invalid JSON during initialization');
                         }
-                        
+
                         if (!initData.success) {
                             throw new Error(initData.error || 'Failed to initialize upload');
                         }
-                        
+
                         // Upload each chunk with retry logic
                         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
                             const start = chunkIndex * this.chunkSize;
@@ -699,10 +728,8 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                                 current: chunkIndex + 1,
                                 total: totalChunks
                             };
-                            
                             let attempts = 0;
                             let success = false;
-                            
                             while (attempts < this.maxRetries && !success) {
                                 try {
                                     attempts++;
@@ -717,7 +744,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                                     await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
                                 }
                             }
-                            
                             uploadedChunks++;
                             totalUploaded += chunk.size;
                             this.progress = Math.round((totalUploaded * 100) / file.size);
@@ -744,7 +770,7 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             console.error('Failed to parse final response as JSON', e);
                             throw new Error('Server returned invalid JSON during finalization');
                         }
-                        
+
                         if (!result.success) {
                             throw new Error(result.error || 'Upload failed');
                         }
@@ -821,9 +847,8 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                             clearTimeout(timeoutId);
                             if (error.name === 'AbortError') {
                                 reject(new Error(`Request to ${url} timed out`));
-                            } else {
-                                reject(error);
                             }
+                            reject(error);
                         });
                     });
                 },
@@ -831,9 +856,6 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                     const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
                     const originalText = copyBtn.innerHTML;
-                    
-                    copyText.select();
-                    navigator.clipboard.writeText(copyText.value);
                     
                     // Update button text and style
                     copyBtn.innerHTML = `
@@ -847,6 +869,10 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
                     copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                     
+                    // Copy the text
+                    copyText.select();
+                    navigator.clipboard.writeText(copyText.value);
+                    
                     // Reset button after 1 second
                     setTimeout(() => {
                         copyBtn.innerHTML = originalText;
@@ -859,19 +885,3 @@ function completeUpload($filePath, $fileName, $fileSize, $isTemporary = false) {
     </script>
 </body>
 </html>
-<!-- Add this CSS for better mobile responsiveness -->
-<style>
-@media (max-width: 576px) {
-    .input-group {
-        flex-direction: column;
-    }
-    .input-group .form-control {
-        border-radius: .25rem !important;
-        margin-bottom: 10px;
-    }
-    .input-group .btn {
-        border-radius: .25rem !important;
-        width: 100%;
-    }
-}
-</style>

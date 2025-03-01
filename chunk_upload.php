@@ -1,8 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/upload_helper.php';
-require_once __DIR__ . '/db_upload_helper.php';
 session_start();
+require_once __DIR__ . '/vendor/autoload.php';
 
 // Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -12,170 +11,123 @@ if (!isset($_SESSION['user_id'])) {
         'success' => false,
         'error' => 'Login required to upload files'
     ]);
-    logUploadActivity('Upload attempt failed - user not logged in', 'error');
     exit;
 }
 
-// Set maximum execution time to handle large uploads
-set_time_limit(3600);
-ini_set('memory_limit', '512M');
-
-// Always set proper content type for JSON responses
 header('Content-Type: application/json');
 
 try {
-    // Initialize upload directory
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // For JSON initialization request
-        $contentType = isset($_SERVER["CONTENT_TYPE"]) ? trim($_SERVER["CONTENT_TYPE"]) : '';
+    // Handle initialization request
+    if ($_SERVER['CONTENT_TYPE'] === 'application/json') {
+        $json = file_get_contents('php://input');
+        $data = json_decode($json, true);
         
-        if (strpos($contentType, 'application/json') !== false) {
-            // Get and decode JSON input
-            $inputJSON = file_get_contents('php://input');
-            $data = json_decode($inputJSON, true);
-            
-            if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-                throw new Exception('Invalid JSON: ' . json_last_error_msg());
-            }
-            
-            if (!isset($data['action']) || $data['action'] !== 'init') {
-                throw new Exception('Invalid action');
-            }
-            
-            if (!isset($data['fileId']) || !isset($data['fileName']) || !isset($data['totalChunks'])) {
-                throw new Exception('Missing required parameters');
-            }
-            
-            $fileId = $data['fileId'];
-            
-            // Create temporary directory for chunks
-            $tempDir = __DIR__ . '/temp/' . $fileId;
-            if (!is_dir($tempDir)) {
-                if (!mkdir($tempDir, 0755, true)) {
-                    throw new Exception('Failed to create temporary directory');
-                }
-            }
-            
-            // Record upload initialization in database
-            $userId = $_SESSION['user_id'];
-            $fileSize = isset($data['fileSize']) ? $data['fileSize'] : 0;
-            $dbResult = saveUploadStatus($fileId, $userId, 'initialized', $data['fileName'], $fileSize);
-            
-            if (!$dbResult) {
-                logUploadActivity('Failed to record upload initialization in database', 'warning');
-                // Continue anyway as this is not fatal
-            }
-            
-            // Return success response
-            echo json_encode(['success' => true, 'message' => 'Upload initialized']);
-            logUploadActivity('Upload initialized for fileId: ' . $fileId, 'info');
-            exit;
+        if (!$data || !isset($data['action']) || $data['action'] !== 'init' || 
+            !isset($data['fileId']) || !isset($data['fileName'])) {
+            throw new Exception('Invalid initialization request');
         }
-        // For chunk upload request
-        elseif (isset($_FILES['chunk'])) {
-            if (!isset($_POST['fileId']) || !isset($_POST['chunkIndex'])) {
-                throw new Exception('Missing required parameters for chunk upload');
+        
+        // Create temp directory if it doesn't exist
+        $tempBaseDir = __DIR__ . '/temp';
+        if (!is_dir($tempBaseDir)) {
+            if (!mkdir($tempBaseDir, 0755, true)) {
+                throw new Exception('Failed to create temp directory');
             }
-            
-            $fileId = $_POST['fileId'];
-            $chunkIndex = $_POST['chunkIndex'];
-            $totalChunks = isset($_POST['totalChunks']) ? intval($_POST['totalChunks']) : 0;
-            $chunk = $_FILES['chunk'];
-            
-            if ($chunk['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception('Chunk upload failed: ' . getUploadErrorMessage($chunk['error']));
-            }
-            
-            // Ensure temp directory exists
-            $tempDir = __DIR__ . '/temp/' . $fileId;
-            if (!is_dir($tempDir)) {
-                if (!mkdir($tempDir, 0755, true)) {
-                    throw new Exception('Failed to create temporary directory for chunk');
-                }
-            }
-            
-            // Save the chunk with low-memory approach
-            $chunkPath = $tempDir . '/chunk_' . str_pad($chunkIndex, 5, '0', STR_PAD_LEFT);
-            
-            // Use direct move_uploaded_file which is more efficient
-            if (!move_uploaded_file($chunk['tmp_name'], $chunkPath)) {
-                throw new Exception('Failed to save chunk: Permission denied or disk full');
-            }
-            
-            // Update progress in database if total chunks is known
-            if ($totalChunks > 0) {
-                $progress = round(($chunkIndex + 1) / $totalChunks * 100);
-                updateUploadProgress($fileId, $progress);
-            }
-            
-            // Check if this was the last chunk and combine if needed
-            if (isset($_POST['isLastChunk']) && $_POST['isLastChunk'] === 'true') {
-                // Update database status to processing
-                saveUploadStatus($fileId, $_SESSION['user_id'], 'processing', $_POST['fileName'] ?? 'unknown');
-                
-                // Combine chunks logic would go here
-                // ...
-                
-                // Update database status to completed
-                saveUploadStatus($fileId, $_SESSION['user_id'], 'completed', $_POST['fileName'] ?? 'unknown');
-            }
-            
-            echo json_encode([
-                'success' => true,
-                'message' => 'Chunk uploaded successfully',
-                'chunkIndex' => $chunkIndex
-            ]);
-            logUploadActivity('Chunk ' . $chunkIndex . ' uploaded for fileId: ' . $fileId, 'info');
-            exit;
-        } else {
-            throw new Exception('Invalid request format');
         }
-    } else {
-        throw new Exception('Only POST requests are allowed');
+        
+        // Create directory for this file's chunks
+        $tempDir = $tempBaseDir . '/' . $data['fileId'];
+        if (!mkdir($tempDir, 0755, true)) {
+            throw new Exception('Failed to create directory for chunks');
+        }
+        
+        // Record upload session in database for tracking
+        $db = getDBConnection();
+        $stmt = $db->prepare("INSERT INTO upload_sessions (
+            file_id, 
+            file_name, 
+            total_size,
+            total_chunks,
+            user_id, 
+            status
+        ) VALUES (?, ?, ?, ?, ?, ?)");
+        
+        $status = 'in_progress';
+        $stmt->bind_param("ssiiis", 
+            $data['fileId'],
+            $data['fileName'],
+            $data['fileSize'],
+            $data['totalChunks'],
+            $_SESSION['user_id'],
+            $status
+        );
+        
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to record upload session: ' . $stmt->error);
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Chunk upload initialized',
+            'fileId' => $data['fileId']
+        ]);
+        exit;
     }
+    
+    // Handle chunk upload
+    if (!isset($_POST['fileId']) || !isset($_POST['chunkIndex']) || !isset($_FILES['chunk'])) {
+        throw new Exception('Missing required chunk upload parameters');
+    }
+    
+    $fileId = $_POST['fileId'];
+    $chunkIndex = (int)$_POST['chunkIndex'];
+    $chunk = $_FILES['chunk'];
+    
+    // Validate chunk upload
+    if ($chunk['error'] !== UPLOAD_ERR_OK) {
+        $errorMessages = [
+            UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive in php.ini',
+            UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form',
+            UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+        ];
+        throw new Exception('Chunk upload failed: ' . 
+            ($errorMessages[$chunk['error']] ?? 'Unknown error code: ' . $chunk['error']));
+    }
+    
+    $tempDir = __DIR__ . '/temp/' . $fileId;
+    if (!is_dir($tempDir)) {
+        throw new Exception('Upload session not initialized properly');
+    }
+    
+    // Save the chunk
+    $chunkPath = $tempDir . '/chunk_' . $chunkIndex;
+    if (!move_uploaded_file($chunk['tmp_name'], $chunkPath)) {
+        throw new Exception('Failed to save chunk file');
+    }
+    
+    // Update the session record
+    $db = getDBConnection();
+    $stmt = $db->prepare("UPDATE upload_sessions SET uploaded_chunks = uploaded_chunks + 1, last_activity = NOW() WHERE file_id = ?");
+    $stmt->bind_param("s", $fileId);
+    $stmt->execute();
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Chunk uploaded successfully',
+        'chunkIndex' => $chunkIndex
+    ]);
     
 } catch (Exception $e) {
-    error_log('Chunk upload error: ' . $e->getMessage());
-    logUploadActivity('Chunk upload error: ' . $e->getMessage(), 'error');
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage()
+    ]);
     
-    // Check if it's a database-specific error
-    if (strpos($e->getMessage(), 'MySQL server has gone away') !== false) {
-        http_response_code(503);  // Service Unavailable
-        echo json_encode([
-            'success' => false,
-            'error' => 'Database connection lost. Please try again.',
-            'errorCode' => 'DB_CONNECTION_LOST',
-            'recoverable' => true  // Client can retry
-        ]);
-    } else {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'error' => $e->getMessage()
-        ]);
-    }
-    exit;
+    // Log the error
+    error_log('Chunk upload error: ' . $e->getMessage());
 }
-
-// Helper function to get upload error messages
-function getUploadErrorMessage($errorCode) {
-    switch ($errorCode) {
-        case UPLOAD_ERR_INI_SIZE:
-            return 'The uploaded file exceeds the upload_max_filesize directive in php.ini';
-        case UPLOAD_ERR_FORM_SIZE:
-            return 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form';
-        case UPLOAD_ERR_PARTIAL:
-            return 'The uploaded file was only partially uploaded';
-        case UPLOAD_ERR_NO_FILE:
-            return 'No file was uploaded';
-        case UPLOAD_ERR_NO_TMP_DIR:
-            return 'Missing a temporary folder';
-        case UPLOAD_ERR_CANT_WRITE:
-            return 'Failed to write file to disk';
-        case UPLOAD_ERR_EXTENSION:
-            return 'A PHP extension stopped the file upload';
-        default:
-            return 'Unknown upload error';
-    }
-}
-?>
