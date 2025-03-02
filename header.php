@@ -9,7 +9,7 @@
                         <div class="flex">                           
                             <!-- Logo -->
                             <div class="flex-shrink-0 flex items-center">
-                                <a href="/" class="text-xl font-bold text-gray-800">OneNetly</a>
+                                <a href="/" class="text-xl font-bold text-gray-800"><?php echo getSiteName(); ?></a>
                             </div>
                         </div>
 

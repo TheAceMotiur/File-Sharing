@@ -56,7 +56,7 @@ class EmailService {
                 <p>We received a request to reset your password. Click the link below to reset your password:</p>
                 <a href='{$resetLink}'>Reset Password</a>
                 <p>If you did not request a password reset, please ignore this email.</p>
-                <p>Thank you,<br>OneNetly Team</p>
+                <p>Thank you,<br><?php echo getSiteName(); ?> Team</p>
             ";
 
             return $this->mailer->send();

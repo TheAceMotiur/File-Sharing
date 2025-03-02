@@ -16,7 +16,7 @@ $link = isset($_SESSION['download_link']) ? $_SESSION['download_link'] : '';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Please Wait - OneNetly</title>
+    <title>Please Wait - <?php echo getSiteName(); ?></title>
     <meta name="description" content="Your download will be ready in a few seconds. Please wait while we prepare your file.">
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,19 +25,7 @@ $link = isset($_SESSION['download_link']) ? $_SESSION['download_link'] : '';
 </head>
 <body class="bg-gray-50">
     <?php include 'header.php'; ?>
-<script src="https://freenetly.com/js/adblock-detector.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const detector = new AdBlockDetector({
-            warningMessage: 'Please disable your ad blocker to continue',
-            warningTitle: '🛡️ Ad Blocker Detected',
-            opacity: 0.95,
-            blur: true,
-            blurAmount: 5,
-        });
-        detector.init();
-    });
-</script>
+    
     <!-- Top Ad Unit -->
     <div class="text-center my-2 sm:my-4 px-2 sm:px-4">
         <ins class="adsbygoogle"
