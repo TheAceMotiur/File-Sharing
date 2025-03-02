@@ -82,7 +82,7 @@ require_once __DIR__ . '/config.php';
                 <h2 class="text-2xl font-semibold mb-4">Delete File</h2>
                 <p class="mb-2"><span class="font-semibold">GET</span> /api.php?action=delete&file_id=FILE_ID</p>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Example Request</h3>
-                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://onenetly.com/api.php?action=delete&file_id=abc123</code></pre>
+                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://fileswith.com/api.php?action=delete&file_id=abc123</code></pre>
                 
                 <h3 class="text-lg font-semibold mt-4 mb-2">Response</h3>
                 <pre><code class="language-json">{
@@ -100,7 +100,7 @@ require_once __DIR__ . '/config.php';
                 <p class="mb-2"><span class="font-semibold">POST</span> /api.php?action=rename&file_id=FILE_ID&new_name=NEW_NAME</p>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Example Request</h3>
                 <pre><code class="language-bash">curl -X POST -H "X-Api-Key: YOUR_API_KEY" \
-    "https://onenetly.com/api.php?action=rename&file_id=abc123&new_name=newname.pdf"</code></pre>
+    "https://fileswith.com/api.php?action=rename&file_id=abc123&new_name=newname.pdf"</code></pre>
                 
                 <h3 class="text-lg font-semibold mt-4 mb-2">Response</h3>
                 <pre><code class="language-json">{
@@ -137,7 +137,7 @@ require_once __DIR__ . '/config.php';
                 <h2 class="text-2xl font-semibold mb-4">PHP Example</h2>
                 <pre><code class="language-php"><?php echo htmlspecialchars('<?php
 $API_KEY = "YOUR_API_KEY";
-$API_URL = "https://onenetly.com/api.php";
+$API_URL = "https://fileswith.com/api.php";
 
 function makeRequest($url, $options = []) {
     $ch = curl_init($url);

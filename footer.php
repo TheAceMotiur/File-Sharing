@@ -6,7 +6,7 @@
         <a href="terms" class="text-gray-500 transition duration-100 hover:text-indigo-500 active:text-indigo-600">Terms</a>
         <a href="privacy" class="text-gray-500 transition duration-100 hover:text-indigo-500 active:text-indigo-600">Privacy</a>
         <a href="dmca" class="text-gray-500 transition duration-100 hover:text-indigo-500 active:text-indigo-600">DMCA</a>
-        <a href="docs" class="text-gray-500 transition duration-100 hover:text-indigo-500 active:text-indigo-600">Docs</a>
+        <a href="docs.php" class="text-gray-500 transition duration-100 hover:text-indigo-500 active:text-indigo-600">Docs</a>
       </nav>
       <!-- nav - end -->
 

@@ -41,7 +41,7 @@ session_start();
                 <p class="text-gray-600 mb-4">Send your DMCA notice to our designated copyright agent:</p>
                 <div class="bg-gray-50 rounded-lg p-4">
                     <p class="text-gray-600">Copyright Agent - OneNetly</p>
-                    <p class="text-gray-600">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'copyright@OneNetly.com'); ?></p>
+                    <p class="text-gray-600">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'copyright@fileswith.com'); ?></p>
                 </div>
             </section>
 
@@ -69,7 +69,7 @@ session_start();
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">7. Contact Information</h2>
                 <p class="text-gray-600">For any questions regarding this DMCA policy, please contact us at:</p>
-                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@onenetly.com'); ?></p>
+                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@fileswith.com'); ?></p>
             </section>
         </div>
 

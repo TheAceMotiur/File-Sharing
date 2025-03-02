@@ -2,4 +2,3 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /cron/
-Sitemap: https://onenetly.com/sitemap.xml

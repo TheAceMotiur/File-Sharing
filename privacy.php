@@ -98,7 +98,7 @@ session_start();
             <section>
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">7. Contact Us</h2>
                 <p class="text-gray-600">If you have any questions about this Privacy Policy, please contact us at:</p>
-                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@onenetly.com'); ?></p>
+                <p class="text-gray-600 mt-2">Email: <?php echo htmlspecialchars($settings['contact_email'] ?? 'support@fileswith.com'); ?></p>
             </section>
         </div>
 
