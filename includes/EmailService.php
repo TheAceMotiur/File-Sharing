@@ -36,6 +36,7 @@ class EmailService {
                 <p>Please use the following PIN to verify your email address:</p>
                 <h1>{$pin}</h1>
                 <p>If you did not create an account, please ignore this email.</p>
+                <p>Thank you,<br>" . getSiteName() . " Team</p>
             ";
 
             return $this->mailer->send();
@@ -56,7 +57,7 @@ class EmailService {
                 <p>We received a request to reset your password. Click the link below to reset your password:</p>
                 <a href='{$resetLink}'>Reset Password</a>
                 <p>If you did not request a password reset, please ignore this email.</p>
-                <p>Thank you,<br><?php echo getSiteName(); ?> Team</p>
+                <p>Thank you,<br>" . getSiteName() . " Team</p>
             ";
 
             return $this->mailer->send();

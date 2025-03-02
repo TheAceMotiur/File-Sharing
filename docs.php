@@ -6,7 +6,7 @@ require_once __DIR__ . '/config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Documentation - OneNetly</title>
+    <title>API Documentation - <?php echo getSiteName(); ?></title>
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
@@ -24,7 +24,7 @@ require_once __DIR__ . '/config.php';
             <section class="mb-8">
                 <h2 class="text-2xl font-semibold mb-4">Authentication</h2>
                 <p class="mb-4">All API requests require an API key passed in the X-Api-Key header. Get your API key from the <a href="/keys.php" class="text-blue-600 hover:underline">API Keys page</a>.</p>
-                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://onenetly.com/api.php</code></pre>
+                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://<?php echo $_SERVER['HTTP_HOST']; ?>/api.php</code></pre>
             </section>
 
             <!-- List Files -->
@@ -32,7 +32,7 @@ require_once __DIR__ . '/config.php';
                 <h2 class="text-2xl font-semibold mb-4">List Files</h2>
                 <p class="mb-2"><span class="font-semibold">GET</span> /api.php?action=list</p>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Example Request</h3>
-                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://onenetly.com/api.php?action=list</code></pre>
+                <pre><code class="language-bash">curl -H "X-Api-Key: YOUR_API_KEY" https://<?php echo $_SERVER['HTTP_HOST']; ?>/api.php?action=list</code></pre>
                 
                 <h3 class="text-lg font-semibold mt-4 mb-2">Response</h3>
                 <pre><code class="language-json">{
@@ -57,7 +57,7 @@ require_once __DIR__ . '/config.php';
                 <h2 class="text-2xl font-semibold mb-4">Upload File</h2>
                 <p class="mb-2"><span class="font-semibold">POST</span> /api.php?action=upload</p>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Example Request</h3>
-                <pre><code class="language-bash">curl -X POST https://onenetly.com/api.php?action=upload \
+                <pre><code class="language-bash">curl -X POST https://<?php echo $_SERVER['HTTP_HOST']; ?>/api.php?action=upload \
     -H "X-Api-Key: YOUR_API_KEY" \
     -F "file=@/path/to/file.pdf"</code></pre>
                 
@@ -66,7 +66,7 @@ require_once __DIR__ . '/config.php';
     "success": true,
     "data": {
         "file_id": "abc123",
-        "download_url": "https://onenetly.com/download/abc123"
+        "download_url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>/download/abc123"
     }
 }</code></pre>
 
