@@ -4,6 +4,8 @@ session_start();
 require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
+$siteName = getSiteName();
+
 function getFileFromCache($fileId) {
     $cacheDir = __DIR__ . '/cache';
     $cachePath = $cacheDir . '/' . $fileId;
@@ -229,7 +231,7 @@ try {
     ?>
     
     <!-- Primary Meta Tags -->
-    <title><?php echo "Download " . htmlspecialchars($fileName) . " - " . getSiteName(); ?></title>
+    <title><?php echo htmlspecialchars($pageTitle); ?> - <?php echo $siteName; ?></title>
     <meta name="title" content="<?php echo htmlspecialchars($pageTitle); ?>">
     <meta name="description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl); ?>">
@@ -244,7 +246,7 @@ try {
     <meta property="og:title" content="<?php echo htmlspecialchars($pageTitle); ?>">
     <meta property="og:description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <meta property="og:image" content="<?php echo htmlspecialchars($previewImage); ?>">
-    <meta property="og:site_name" content="<?php echo getSiteName(); ?>">
+    <meta property="og:site_name" content="<?php echo $siteName; ?>">
     <?php if ($isImage): ?>
     <meta property="og:image:type" content="<?php echo mime_content_type($fileName); ?>">
     <meta property="og:image:width" content="1200">
@@ -267,8 +269,8 @@ try {
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="OneNetly">
-    <meta name="apple-mobile-web-app-title" content="OneNetly">
+    <meta name="application-name" content="<?php echo $siteName; ?>">
+    <meta name="apple-mobile-web-app-title" content="<?php echo $siteName; ?>">
 
     <!-- JSON-LD Structured Data with more details -->
     <script type="application/ld+json">
@@ -286,7 +288,7 @@ try {
         },
         "publisher": {
             "@type": "Organization",
-            "name": "OneNetly",
+            "name": "<?php echo $siteName; ?>",
             "url": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }
     }
