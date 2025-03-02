@@ -33,8 +33,3 @@ Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type,
 # Additional headers for proxy support
 Header set X-Frame-Options "ALLOWALL"
 Header set X-Content-Type-Options "nosniff"
-
-# Serve sitemaps
-RewriteRule ^sitemap\.xml$ sitemap.php [L]
-RewriteRule ^sitemaps/sitemap([0-9]+)\.xml$ sitemaps/sitemap$1.xml [L]
-RewriteRule ^sitemaps/sitemap-([0-9]+)\.xml$ sitemaps/sitemap$1.xml [L]

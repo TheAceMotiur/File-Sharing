@@ -6,11 +6,23 @@ use Spatie\Dropbox\Client as DropboxClient;
 
 $siteName = getSiteName();
 
+// Add this helper function before the main request handling
+function removeChunkDirectory($chunksDir) {
+    if (is_dir($chunksDir)) {
+        $files = glob($chunksDir . '/*');
+        foreach ($files as $file) {
+            unlink($file);
+        }
+        rmdir($chunksDir);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
     // Handle chunk uploads
     if (isset($_POST['chunk'])) {
+        $chunksDir = '';
         try {
             if (!isset($_SESSION['user_id'])) {
                 throw new Exception('Login required to upload files');
@@ -42,106 +54,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($currentChunk == $totalChunks - 1) {
                 // Combine chunks
                 $finalFile = fopen($chunksDir . '/' . $fileName, 'wb');
-                for ($i = 0; $i < $totalChunks; $i++) {
-                    $chunkContent = file_get_contents($chunksDir . '/' . $i);
-                    fwrite($finalFile, $chunkContent);
-                    unlink($chunksDir . '/' . $i);
-                }
-                fclose($finalFile);
-
-                // Get file mime type
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                $mimeType = finfo_file($finfo, $chunksDir . '/' . $fileName);
-                finfo_close($finfo);
-
-                // Validate file type
-                $allowedTypes = [
-                    // Images
-                    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-                    // Audio
-                    'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
-                    // Video
-                    'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-                    // Archives
-                    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-                    'application/x-tar', 'application/gzip',
-                    // Documents
-                    'application/pdf', 'image/vnd.djvu',
-                    // Other media
-                    'application/vnd.apple.mpegurl', 'application/x-mpegurl'
-                ];
-
-                if (!in_array($mimeType, $allowedTypes)) {
-                    // Cleanup and throw error
-                    array_map('unlink', glob($chunksDir . '/*'));
-                    rmdir($chunksDir);
-                    throw new Exception('File type not allowed');
-                }
-
-                // Upload to Dropbox
-                $db = getDBConnection();
-                $dropbox = $db->query("
-                    SELECT da.*, 
-                           COALESCE(SUM(fu.size), 0) as used_storage
-                    FROM dropbox_accounts da
-                    LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
-                        AND fu.upload_status = 'completed'
-                    GROUP BY da.id
-                    HAVING used_storage < 2147483648 OR used_storage IS NULL
-                    LIMIT 1
-                ")->fetch_assoc();
-
-                if (!$dropbox) {
-                    throw new Exception('No storage available');
-                }
-
-                $client = new Spatie\Dropbox\Client($dropbox['access_token']);
-                $dropboxPath = "/{$fileId}/{$fileName}";
                 
-                // Upload to Dropbox using chunks
-                $handle = fopen($chunksDir . '/' . $fileName, 'rb');
-                $cursor = $client->uploadSessionStart(fread($handle, 1024 * 1024 * 10));
-                
-                while (!feof($handle)) {
-                    $client->uploadSessionAppend(fread($handle, 1024 * 1024 * 10), $cursor);
+                try {
+                    for ($i = 0; $i < $totalChunks; $i++) {
+                        $chunkContent = file_get_contents($chunksDir . '/' . $i);
+                        if ($chunkContent === false) {
+                            throw new Exception('Failed to read chunk ' . $i);
+                        }
+                        fwrite($finalFile, $chunkContent);
+                        unlink($chunksDir . '/' . $i);
+                    }
+                    fclose($finalFile);
+
+                    // Get file mime type
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mimeType = finfo_file($finfo, $chunksDir . '/' . $fileName);
+                    finfo_close($finfo);
+
+                    // Validate file type
+                    $allowedTypes = [
+                        // Images
+                        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                        // Audio
+                        'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
+                        // Video
+                        'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
+                        // Archives
+                        'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+                        'application/x-tar', 'application/gzip',
+                        // Documents
+                        'application/pdf', 'image/vnd.djvu',
+                        // Other media
+                        'application/vnd.apple.mpegurl', 'application/x-mpegurl'
+                    ];
+
+                    if (!in_array($mimeType, $allowedTypes)) {
+                        // Cleanup and throw error
+                        removeChunkDirectory($chunksDir);
+                        throw new Exception('File type not allowed');
+                    }
+
+                    // Upload to Dropbox
+                    $db = getDBConnection();
+                    $dropbox = $db->query("
+                        SELECT da.*, 
+                               COALESCE(SUM(fu.size), 0) as used_storage
+                        FROM dropbox_accounts da
+                        LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
+                            AND fu.upload_status = 'completed'
+                        GROUP BY da.id
+                        HAVING used_storage < 2147483648 OR used_storage IS NULL
+                        LIMIT 1
+                    ")->fetch_assoc();
+
+                    if (!$dropbox) {
+                        throw new Exception('No storage available');
+                    }
+
+                    $client = new Spatie\Dropbox\Client($dropbox['access_token']);
+                    $dropboxPath = "/{$fileId}/{$fileName}";
+                    
+                    // Upload to Dropbox using chunks
+                    $handle = fopen($chunksDir . '/' . $fileName, 'rb');
+                    $cursor = $client->uploadSessionStart(fread($handle, 1024 * 1024 * 10));
+                    
+                    while (!feof($handle)) {
+                        $client->uploadSessionAppend(fread($handle, 1024 * 1024 * 10), $cursor);
+                    }
+                    
+                    $client->uploadSessionFinish('', $cursor, $dropboxPath);
+                    fclose($handle);
+
+                    // Save to database
+                    $stmt = $db->prepare("INSERT INTO file_uploads (
+                        file_id, file_name, size, upload_status, dropbox_path, 
+                        dropbox_account_id, uploaded_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    
+                    $status = 'completed';
+                    $stmt->bind_param("ssissii", 
+                        $fileId,
+                        $fileName,
+                        $fileSize,
+                        $status,
+                        $dropboxPath,
+                        $dropbox['id'],
+                        $_SESSION['user_id']
+                    );
+                    $stmt->execute();
+
+                    // Cleanup
+                    removeChunkDirectory($chunksDir);
+
+                    echo json_encode([
+                        'success' => true,
+                        'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
+                    ]);
+                    exit;
+                } catch (Exception $e) {
+                    if (is_resource($finalFile)) {
+                        fclose($finalFile);
+                    }
+                    removeChunkDirectory($chunksDir);
+                    throw $e;
                 }
-                
-                $client->uploadSessionFinish('', $cursor, $dropboxPath);
-                fclose($handle);
-
-                // Save to database
-                $stmt = $db->prepare("INSERT INTO file_uploads (
-                    file_id, file_name, size, upload_status, dropbox_path, 
-                    dropbox_account_id, uploaded_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                
-                $status = 'completed';
-                $stmt->bind_param("ssissii", 
-                    $fileId,
-                    $fileName,
-                    $fileSize,
-                    $status,
-                    $dropboxPath,
-                    $dropbox['id'],
-                    $_SESSION['user_id']
-                );
-                $stmt->execute();
-
-                // Cleanup
-                array_map('unlink', glob($chunksDir . '/*'));
-                rmdir($chunksDir);
-
-                echo json_encode([
-                    'success' => true,
-                    'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
-                ]);
-                exit;
             }
 
             echo json_encode(['success' => true, 'chunk' => $currentChunk]);
             exit;
 
         } catch (Exception $e) {
+            // Clean up on error
+            if (!empty($chunksDir)) {
+                removeChunkDirectory($chunksDir);
+            }
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             exit;
@@ -346,7 +372,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "name": "Home",
             "item": "https://<?php echo $_SERVER['HTTP_HOST']; ?>"
         }]
-    }
     </script>
 
     <!-- Favicon -->
