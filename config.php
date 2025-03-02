@@ -39,4 +39,13 @@ function getDBConnection() {
     
     return $db;
 }
+
+function getSiteName() {
+    $db = getDBConnection();
+    $result = $db->query("SELECT setting_value FROM site_settings WHERE setting_key = 'site_name'");
+    if ($row = $result->fetch_assoc()) {
+        return htmlspecialchars($row['setting_value']);
+    }
+    return 'OneNetly'; // Fallback name
+}
 ?>

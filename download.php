@@ -229,7 +229,7 @@ try {
     ?>
     
     <!-- Primary Meta Tags -->
-    <title><?php echo htmlspecialchars($pageTitle); ?></title>
+    <title><?php echo "Download " . htmlspecialchars($fileName) . " - " . getSiteName(); ?></title>
     <meta name="title" content="<?php echo htmlspecialchars($pageTitle); ?>">
     <meta name="description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl); ?>">
@@ -244,6 +244,7 @@ try {
     <meta property="og:title" content="<?php echo htmlspecialchars($pageTitle); ?>">
     <meta property="og:description" content="<?php echo htmlspecialchars($pageDescription); ?>">
     <meta property="og:image" content="<?php echo htmlspecialchars($previewImage); ?>">
+    <meta property="og:site_name" content="<?php echo getSiteName(); ?>">
     <?php if ($isImage): ?>
     <meta property="og:image:type" content="<?php echo mime_content_type($fileName); ?>">
     <meta property="og:image:width" content="1200">
