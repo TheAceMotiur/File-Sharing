@@ -193,9 +193,7 @@ try {
     $stmt->execute();
 
     // Instead of getting Dropbox temporary link, create direct download URL
-    $directDownloadUrl = isset($file['file_name']) 
-        ? "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/" . urlencode($file['file_name'])
-        : "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;
+    $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
     $downloadUrl = $directDownloadUrl; // Use direct download URL instead of Dropbox temporary link
 
     $fileName = htmlspecialchars($file['file_name']);

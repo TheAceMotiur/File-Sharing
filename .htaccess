@@ -5,8 +5,7 @@ RewriteEngine On
 RewriteCond %{THE_REQUEST} \ /+download\.php\?id=([a-zA-Z0-9]+)\ HTTP
 RewriteRule ^ /download/%1? [L,R=301]
 
-# Internal rewrites for download URLs with filename
-RewriteRule ^download/([a-zA-Z0-9]+)/([^/]+)$ download.php?id=$1&filename=$2 [L]
+# Internal rewrites for download URLs 
 RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L]
 RewriteRule ^download/([a-zA-Z0-9]+)/download$ /download.php?file_id=$1 [L,QSA]
 
