@@ -14,6 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+// Add debug headers
+header('X-Debug-PHP-Version: ' . phpversion());
+header('X-Debug-Request-Method: ' . $_SERVER['REQUEST_METHOD']);
+header('X-Debug-Request-URI: ' . $_SERVER['REQUEST_URI']);
+
 header('Content-Type: application/xml');
 
 try {
@@ -24,14 +29,24 @@ try {
         if (isset($result['error'])) {
             $code = $result['code'] ?? 400;
             http_response_code($code);
-            echo xmlResponse(['Error' => ['Message' => $result['error']]]);
+            header('X-Debug-Error: ' . $result['error']);
+            echo xmlResponse(['Error' => [
+                'Code' => (string)$code,
+                'Message' => $result['error'],
+                'RequestId' => uniqid()
+            ]]);
         } else {
             echo xmlResponse($result);
         }
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo xmlResponse(['Error' => ['Message' => $e->getMessage()]]);
+    header('X-Debug-Error: ' . $e->getMessage());
+    echo xmlResponse(['Error' => [
+        'Code' => '500',
+        'Message' => $e->getMessage(),
+        'RequestId' => uniqid()
+    ]]);
 }
 
 function xmlResponse($data) {

@@ -55,7 +55,14 @@ class S3CompatApi {
             $delimiter = $_GET['delimiter'] ?? '/';
             $maxKeys = (int)($_GET['max-keys'] ?? 1000);
             
+            // Add error logging
+            error_log("Listing objects with prefix: " . $prefix);
+            
             $response = $this->dropbox->listFolder($this->basePath . '/' . $prefix);
+            
+            if (!isset($response['entries'])) {
+                throw new Exception('Invalid response from Dropbox');
+            }
             
             $objects = [];
             foreach ($response['entries'] as $entry) {
@@ -69,6 +76,9 @@ class S3CompatApi {
                 }
             }
 
+            // Set success response code
+            http_response_code(200);
+            
             return [
                 'ListBucketResult' => [
                     'Name' => 'default',
@@ -80,7 +90,12 @@ class S3CompatApi {
                 ]
             ];
         } catch (Exception $e) {
-            return ['error' => $e->getMessage()];
+            error_log("S3 List Error: " . $e->getMessage());
+            http_response_code(400);
+            return [
+                'error' => $e->getMessage(),
+                'code' => 400
+            ];
         }
     }
 
