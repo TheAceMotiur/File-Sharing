@@ -209,6 +209,27 @@ try {
     // Set error variable instead of using die()
     $error = $e->getMessage();
 }
+
+// Get file info from database
+$stmt = $db->prepare("SELECT * FROM file_uploads WHERE file_id = ?");
+$stmt->bind_param("s", $_GET['file_id']);
+$stmt->execute();
+$file = $stmt->get_result()->fetch_assoc();
+
+if (!$file) {
+    throw new Exception("File not found");
+}
+
+// Stream file from Dropbox
+$stream = $dropbox->download($file['dropbox_path']);
+
+// Set headers
+header('Content-Type: ' . mime_content_type($file['file_name']));
+header('Content-Disposition: attachment; filename="' . $file['file_name'] . '"');
+header('Content-Length: ' . $file['size']);
+
+// Output file
+fpassthru($stream);
 ?>
 
 

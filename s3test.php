@@ -91,6 +91,7 @@
             ContentType: file.type
         };
 
+        // Send to Dropbox instead of S3
         s3.upload(params)
             .on('httpUploadProgress', (evt) => {
                 const percentComplete = Math.round((evt.loaded * 100) / evt.total);
@@ -100,7 +101,9 @@
                 if (err) {
                     showResult('Upload error: ' + err);
                 } else {
-                    showResult('Upload successful: ' + JSON.stringify(data, null, 2));
+                    const fileId = generateFileId(); // Generate unique ID
+                    const downloadUrl = `/download/${fileId}/download`;
+                    showResult('Upload successful. Download link: ' + downloadUrl);
                     listFiles();
                 }
             });

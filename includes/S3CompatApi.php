@@ -111,40 +111,42 @@ class S3CompatApi {
 
     private function putObject($bucket, $key) {
         try {
-            // Get content type from headers
-            $contentType = $_SERVER['CONTENT_TYPE'] ?? 'application/octet-stream';
+            // Generate unique file ID
+            $fileId = uniqid('', true);
             
-            // Log upload attempt
-            error_log("S3 Upload: Attempting to upload to path: " . $key);
-            error_log("Content-Type: " . $contentType);
-
-            // Read the raw input
-            $input = fopen('php://input', 'r');
-            if (!$input) {
-                throw new Exception('Failed to read request body');
-            }
-
+            // Create file path in Dropbox
+            $dropboxPath = "/files/{$fileId}/{$key}";
+            
             // Upload to Dropbox
-            $result = $this->dropbox->upload($this->basePath . '/' . $key, $input, 'overwrite');
+            $input = fopen('php://input', 'r');
+            $result = $this->dropbox->upload($dropboxPath, $input, 'overwrite');
             
-            // Calculate ETag (MD5 of file)
-            $etag = md5(stream_get_contents($input));
+            // Save file info to database
+            $stmt = $this->db->prepare("INSERT INTO file_uploads (
+                file_id, 
+                file_name,
+                dropbox_path,
+                size,
+                uploaded_by,
+                upload_status
+            ) VALUES (?, ?, ?, ?, ?, 'completed')");
             
-            // Set S3-compatible response headers
-            $requestId = bin2hex(random_bytes(16));
-            header('x-amz-request-id: ' . $requestId);
-            header('x-amz-id-2: ' . base64_encode(random_bytes(16)));
-            header('ETag: "' . $etag . '"');
-            
-            // Set proper response code
-            http_response_code(200);
-            
+            $size = $_SERVER['CONTENT_LENGTH'] ?? 0;
+            $stmt->bind_param("sssii", 
+                $fileId,
+                $key,
+                $dropboxPath,
+                $size,
+                $this->userId
+            );
+            $stmt->execute();
+
             // Return S3-compatible response
             return [
-                'PutObjectResult' => [
-                    'ETag' => '"' . $etag . '"',
-                    'ServerSideEncryption' => 'AES256'
-                ]
+                'Location' => "/download/{$fileId}/download",
+                'ETag' => md5_file('php://input'),
+                'Bucket' => $bucket,
+                'Key' => $key
             ];
 
         } catch (Exception $e) {
