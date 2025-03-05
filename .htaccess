@@ -7,7 +7,7 @@ RewriteRule ^ /download/%1? [L,R=301]
 
 # Internal rewrites for download URLs 
 RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L]
-RewriteRule ^download/([a-zA-Z0-9]+)/download$ /download.php?file_id=$1 [L,QSA]
+RewriteRule ^download/([a-zA-Z0-9]+)/([^/]+)$ download.php?id=$1&filename=$2 [L,QSA]
 
 # Enable compression
 <IfModule mod_deflate.c>
@@ -34,8 +34,3 @@ Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type,
 Header set X-Frame-Options "ALLOWALL"
 Header set X-Content-Type-Options "nosniff"
 
-# S3 API endpoint (updated)
-RewriteCond %{REQUEST_URI} ^/s3$
-RewriteRule ^s3$ s3api.php [L,QSA]
-RewriteCond %{REQUEST_URI} ^/s3/.* 
-RewriteRule ^s3/(.*)$ s3api.php/$1 [L,QSA]

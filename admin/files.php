@@ -318,13 +318,13 @@ try {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <?php if ($isImage): ?>
-                                    <button onclick="showImagePreview('../download/<?php echo $file['file_id']; ?>/download')" 
+                                    <button onclick="showImagePreview('../download/<?php echo $file['file_id']; ?>/<?php echo urlencode($file['file_name']); ?>')" 
                                             class="text-indigo-600 hover:text-indigo-900 mr-3">
                                         <i class="fa-regular fa-eye mr-1"></i>
                                         Preview
                                     </button>
                                 <?php endif; ?>
-                                <a href="../download/<?php echo $file['file_id']; ?>" 
+                                <a href="../download/<?php echo $file['file_id']; ?>/<?php echo urlencode($file['file_name']); ?>" 
                                    class="text-blue-600 hover:text-blue-900 mr-3">
                                    <i class="fa-solid fa-download mr-1"></i>
                                    Download
