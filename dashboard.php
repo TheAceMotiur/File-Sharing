@@ -423,7 +423,7 @@ function getFileIcon($fileName) {
                                         <?php if ($file['is_image']): ?>
                                         <!-- Preview Button for Images -->
                                         <button type="button"
-                                                onclick="previewImage('<?php echo htmlspecialchars($file['file_name']); ?>', '/download/<?php echo $file['file_id']; ?>/<?php echo urlencode($file['file_name']); ?>')"
+                                                onclick="previewImage('<?php echo htmlspecialchars($file['file_name']); ?>', '/download/<?php echo $file['file_id']; ?>/download')"
                                                 title="Preview"
                                                 class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 
                                                        rounded-xl text-white bg-gradient-to-br from-purple-500 to-purple-600
@@ -440,7 +440,7 @@ function getFileIcon($fileName) {
                                         <?php endif; ?>
                                         
                                         <!-- Download Button -->
-                                        <a href="download/<?php echo $file['file_id']; ?>/<?php echo urlencode($file['file_name']); ?>" 
+                                        <a href="download/<?php echo $file['file_id']; ?>" 
                                            target="_blank"
                                            title="Download"
                                            class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 

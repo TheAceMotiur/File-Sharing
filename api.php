@@ -108,7 +108,7 @@ class API {
 
         return [
             'file_id' => $fileId,
-            'download_url' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/" . urlencode($file['name'])
+            'download_url' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
         ];
     }
 
