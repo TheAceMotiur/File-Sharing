@@ -115,13 +115,53 @@ class S3CompatApi {
 
     private function putObject($path) {
         try {
-            $input = fopen('php://input', 'r');
-            $this->dropbox->upload($this->basePath . $path, $input, 'overwrite');
+            // Get content type from headers
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? 'application/octet-stream';
             
-            header('ETag: "' . md5_file('php://input') . '"');
-            return ['success' => true];
+            // Log upload attempt
+            error_log("S3 Upload: Attempting to upload to path: " . $path);
+            error_log("Content-Type: " . $contentType);
+
+            // Read the raw input
+            $input = fopen('php://input', 'r');
+            if (!$input) {
+                throw new Exception('Failed to read request body');
+            }
+
+            // Upload to Dropbox
+            $result = $this->dropbox->upload($this->basePath . $path, $input, 'overwrite');
+            
+            // Calculate ETag (MD5 of file)
+            $etag = md5(stream_get_contents($input));
+            
+            // Set S3-compatible response headers
+            $requestId = bin2hex(random_bytes(16));
+            header('x-amz-request-id: ' . $requestId);
+            header('x-amz-id-2: ' . base64_encode(random_bytes(16)));
+            header('ETag: "' . $etag . '"');
+            
+            // Set proper response code
+            http_response_code(200);
+            
+            // Return S3-compatible response
+            return [
+                'PutObjectResult' => [
+                    'ETag' => '"' . $etag . '"',
+                    'ServerSideEncryption' => 'AES256'
+                ]
+            ];
+
         } catch (Exception $e) {
-            return ['error' => $e->getMessage()];
+            error_log("S3 Upload Error: " . $e->getMessage());
+            http_response_code(400);
+            return [
+                'error' => $e->getMessage(),
+                'code' => 400
+            ];
+        } finally {
+            if (isset($input) && is_resource($input)) {
+                fclose($input);
+            }
         }
     }
 

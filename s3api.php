@@ -22,6 +22,10 @@ header('X-Debug-Request-URI: ' . $_SERVER['REQUEST_URI']);
 header('Content-Type: application/xml');
 
 try {
+    // Log incoming request
+    error_log("S3 Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
+    error_log("Headers: " . json_encode(getallheaders()));
+    
     $api = new S3CompatApi();
     $result = $api->handleRequest();
     
@@ -29,6 +33,7 @@ try {
         if (isset($result['error'])) {
             $code = $result['code'] ?? 400;
             http_response_code($code);
+            error_log("S3 Error Response: " . $result['error']);
             header('X-Debug-Error: ' . $result['error']);
             echo xmlResponse(['Error' => [
                 'Code' => (string)$code,
@@ -36,10 +41,12 @@ try {
                 'RequestId' => uniqid()
             ]]);
         } else {
+            error_log("S3 Success Response: " . json_encode($result));
             echo xmlResponse($result);
         }
     }
 } catch (Exception $e) {
+    error_log("S3 Fatal Error: " . $e->getMessage());
     http_response_code(500);
     header('X-Debug-Error: ' . $e->getMessage());
     echo xmlResponse(['Error' => [
