@@ -179,6 +179,13 @@
         `).join('');
     }
 
+    function generateFileId() {
+        // Generate a random ID using timestamp and random number
+        const timestamp = new Date().getTime().toString(36);
+        const random = Math.random().toString(36).substr(2, 5);
+        return timestamp + random;
+    }
+
     function showResult(message) {
         const results = document.getElementById('results');
         if (typeof message === 'object') {
