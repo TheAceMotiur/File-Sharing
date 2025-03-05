@@ -63,13 +63,19 @@
         AWS.config.update({
             accessKeyId: apiKey,
             secretAccessKey: apiKey,
-            region: 'us-east-1'
+            region: 'us-east-1',
+            sslEnabled: false,  // Add this for local testing
+            s3ForcePathStyle: true,
         });
 
         s3 = new AWS.S3({
-            endpoint: '/s3',
+            endpoint: window.location.origin + '/s3',
             s3ForcePathStyle: true,
-            signatureVersion: 'v4'
+            signatureVersion: 'v4',
+            // Add these for debugging
+            logger: console,
+            computeChecksums: true,
+            correctClockSkew: true
         });
 
         showResult('S3 client initialized');

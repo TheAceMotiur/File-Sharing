@@ -10,16 +10,17 @@ class S3Auth {
         if (!$auth) {
             $accessKey = $_GET['AWSAccessKeyId'] ?? null;
             if ($accessKey) {
-                // Use API key as both access and secret key
                 return self::validateApiKey($accessKey);
             }
-            return false;
-        }
-
-        // Parse Authorization header
-        if (preg_match('/AWS(?:4-HMAC-SHA256|)\s([^:]+):/', $auth, $matches)) {
-            $accessKey = $matches[1];
-            return self::validateApiKey($accessKey);
+        } else {
+            // Parse AWS v4 signature
+            if (preg_match('/AWS4-HMAC-SHA256\s+Credential=([^\/]+)\//', $auth, $matches)) {
+                return self::validateApiKey($matches[1]);
+            }
+            // Parse AWS v2 signature
+            if (preg_match('/AWS\s+([^:]+):/', $auth, $matches)) {
+                return self::validateApiKey($matches[1]);
+            }
         }
 
         return false;
