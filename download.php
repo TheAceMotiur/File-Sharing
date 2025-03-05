@@ -61,6 +61,13 @@ function isImageFile($fileName) {
     return in_array($extension, $imageExtensions);
 }
 
+// Add this function near the other helper functions
+function isVideoFile($fileName) {
+    $videoExtensions = ['mp4', 'webm', 'ogg'];
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, $videoExtensions);
+}
+
 function streamFileToClient($stream, $filename, $filesize) {
     // Buffer size for streaming (1MB chunks)
     $bufferSize = 1024 * 1024;
@@ -402,6 +409,10 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/report.js"></script>
     <script src="https://base64-encoder.com/wpsafelink.js"></script>
+
+    <!-- Add Video.js CSS and JS in the head section -->
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 </head>
 <body class="bg-gray-50">
     <?php include 'header.php'; ?>
@@ -452,6 +463,53 @@ try {
                                 </div>
                             </div>
                         </div>
+                    <?php elseif (isVideoFile($fileName)): ?>
+                        <div class="mt-4 mb-4">
+                            <p class="text-sm text-gray-600 mb-2">Preview:</p>
+                            <div class="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                                <video
+                                    id="preview-video"
+                                    class="video-js vjs-default-skin vjs-big-play-centered"
+                                    controls
+                                    preload="auto"
+                                    width="100%"
+                                    height="100%"
+                                    poster="/icon.png"
+                                    data-setup='{
+                                        "fluid": true,
+                                        "playbackRates": [0.5, 1, 1.5, 2],
+                                        "controlBar": {
+                                            "volumePanel": {"inline": false},
+                                            "pictureInPictureToggle": true
+                                        }
+                                    }'>
+                                    <source src="<?php echo htmlspecialchars($directDownloadUrl); ?>" type="video/mp4">
+                                    <p class="vjs-no-js">
+                                        To view this video please enable JavaScript, and consider upgrading to a web browser that
+                                        <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                                    </p>
+                                </video>
+                            </div>
+                        </div>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                var player = videojs('preview-video', {
+                                    responsive: true,
+                                    fluid: true
+                                });
+                                
+                                // Add error handling
+                                player.on('error', function() {
+                                    console.log('Video player error:', player.error());
+                                    const playerEl = document.querySelector('#preview-video');
+                                    playerEl.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.className = 'text-center p-4 bg-gray-100 rounded-lg text-gray-600';
+                                    errorDiv.textContent = 'Video preview is not available';
+                                    playerEl.parentNode.appendChild(errorDiv);
+                                });
+                            });
+                        </script>
                     <?php endif; ?>
 
                     <div class="bg-gray-50 rounded-lg p-4 mb-6">
