@@ -33,3 +33,9 @@ Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type,
 # Additional headers for proxy support
 Header set X-Frame-Options "ALLOWALL"
 Header set X-Content-Type-Options "nosniff"
+
+# S3 API endpoint (updated)
+RewriteCond %{REQUEST_URI} ^/s3$
+RewriteRule ^s3$ s3api.php [L,QSA]
+RewriteCond %{REQUEST_URI} ^/s3/.*
+RewriteRule ^s3/(.*)$ s3api.php/$1 [L,QSA]
