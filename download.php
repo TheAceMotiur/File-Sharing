@@ -61,6 +61,65 @@ function isImageFile($fileName) {
     return in_array($extension, $imageExtensions);
 }
 
+function streamFileToClient($stream, $filename, $filesize) {
+    // Buffer size for streaming (1MB chunks)
+    $bufferSize = 1024 * 1024;
+    
+    // Get range from request headers
+    $range = isset($_SERVER['HTTP_RANGE']) ? $_SERVER['HTTP_RANGE'] : null;
+    $start = 0;
+    $end = $filesize - 1;
+    
+    // Handle range request
+    if ($range) {
+        list($unit, $range) = explode('=', $range, 2);
+        if ($unit == 'bytes') {
+            list($start, $end) = explode('-', $range);
+            $start = max(intval($start), 0);
+            $end = ($end) ? min(intval($end), $filesize - 1) : $filesize - 1;
+        }
+    }
+    
+    $length = $end - $start + 1;
+    
+    // Set headers for resume support
+    header('Accept-Ranges: bytes');
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="' . addWatermark($filename) . '"');
+    header('Content-Length: ' . $length);
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Pragma: public');
+    
+    // If range requested, return partial content
+    if ($range) {
+        header('HTTP/1.1 206 Partial Content');
+        header("Content-Range: bytes $start-$end/$filesize");
+    }
+    
+    // Seek to start position if range requested
+    if ($start > 0) {
+        fseek($stream, $start);
+    }
+    
+    // Stream file in chunks
+    $bytesRemaining = $length;
+    while (!feof($stream) && $bytesRemaining > 0) {
+        $readSize = min($bufferSize, $bytesRemaining);
+        $data = fread($stream, $readSize);
+        if ($data === false) {
+            break;
+        }
+        echo $data;
+        flush();
+        $bytesRemaining -= strlen($data);
+        
+        // Check if client disconnected
+        if (connection_status() != CONNECTION_NORMAL) {
+            break;
+        }
+    }
+}
+
 try {
     $db = getDBConnection();
 
@@ -101,12 +160,13 @@ try {
             $cachePath = getFileFromCache($fileId);
             
             if ($cachePath && file_exists($cachePath)) {
-                // Serve from cache
-                header('Content-Type: application/octet-stream');
-                header('Content-Disposition: attachment; filename="' . addWatermark(basename($file['file_name'])) . '"');
-                header('Cache-Control: must-revalidate');
-                header('Pragma: public');
-                readfile($cachePath);
+                // Get filesize for cached file
+                $filesize = filesize($cachePath);
+                $stream = fopen($cachePath, 'rb');
+                
+                // Stream cached file
+                streamFileToClient($stream, $file['file_name'], $filesize);
+                fclose($stream);
                 exit;
             }
             
@@ -139,7 +199,11 @@ try {
             // Initialize Dropbox client
             $client = new DropboxClient($dropbox['access_token']);
             
-            // Get file from Dropbox
+            // Get file metadata first to get size
+            $metadata = $client->getMetadata("/{$fileId}/{$file['file_name']}");
+            $filesize = $metadata['size'];
+            
+            // Get file stream from Dropbox
             $stream = $client->download("/{$fileId}/{$file['file_name']}");
             
             // If downloaded more than 2 times, cache it
@@ -147,26 +211,42 @@ try {
                 $cacheDir = __DIR__ . '/cache';
                 $cachePath = $cacheDir . '/' . $fileId;
                 
-                // Save to cache
-                file_put_contents($cachePath, stream_get_contents($stream));
-                rewind($stream); // Reset stream pointer
-                
-                // Update cache record
-                $stmt = $db->prepare("UPDATE file_downloads 
-                                    SET cache_path = ?, last_cached = CURRENT_TIMESTAMP 
-                                    WHERE file_id = ?");
-                $stmt->bind_param("ss", $cachePath, $fileId);
-                $stmt->execute();
+                // Save to cache in background if possible
+                if (function_exists('fastcgi_finish_request')) {
+                    // Stream file to user first
+                    streamFileToClient($stream, $file['file_name'], $filesize);
+                    fastcgi_finish_request();
+                    
+                    // Then save to cache
+                    file_put_contents($cachePath, stream_get_contents($stream));
+                    
+                    // Update cache record
+                    $stmt = $db->prepare("UPDATE file_downloads 
+                                        SET cache_path = ?, last_cached = CURRENT_TIMESTAMP 
+                                        WHERE file_id = ?");
+                    $stmt->bind_param("ss", $cachePath, $fileId);
+                    $stmt->execute();
+                } else {
+                    // If fastcgi not available, save to cache first
+                    file_put_contents($cachePath, stream_get_contents($stream));
+                    rewind($stream);
+                    
+                    // Update cache record
+                    $stmt = $db->prepare("UPDATE file_downloads 
+                                        SET cache_path = ?, last_cached = CURRENT_TIMESTAMP 
+                                        WHERE file_id = ?");
+                    $stmt->bind_param("ss", $cachePath, $fileId);
+                    $stmt->execute();
+                    
+                    // Then stream to user
+                    streamFileToClient($stream, $file['file_name'], $filesize);
+                }
+            } else {
+                // Stream directly from Dropbox
+                streamFileToClient($stream, $file['file_name'], $filesize);
             }
             
-            // Set headers for file download
-            header('Content-Type: application/octet-stream');
-            header('Content-Disposition: attachment; filename="' . addWatermark(basename($file['file_name'])) . '"');
-            header('Cache-Control: must-revalidate');
-            header('Pragma: public');
-            
-            // Stream file to user
-            fpassthru($stream);
+            fclose($stream);
             exit;
             
         } catch (Exception $e) {
