@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     echo json_encode([
                         'success' => true,
-                        'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
+                        'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/" . urlencode($fileName)
                     ]);
                     exit;
                 } catch (Exception $e) {
@@ -278,7 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute();
 
-        $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;        
+        $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/" . urlencode($file['name']);        
         
         echo json_encode([
             'success' => true,
