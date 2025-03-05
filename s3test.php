@@ -63,19 +63,16 @@
         AWS.config.update({
             accessKeyId: apiKey,
             secretAccessKey: apiKey,
-            region: 'us-east-1',
-            sslEnabled: false,  // Add this for local testing
-            s3ForcePathStyle: true,
+            region: 'us-east-1'
         });
 
         s3 = new AWS.S3({
             endpoint: window.location.origin + '/s3',
             s3ForcePathStyle: true,
             signatureVersion: 'v4',
-            // Add these for debugging
-            logger: console,
-            computeChecksums: true,
-            correctClockSkew: true
+            params: {
+                Bucket: 'default' // Set default bucket
+            }
         });
 
         showResult('S3 client initialized');
@@ -89,20 +86,24 @@
         }
 
         const params = {
-            Bucket: 'default',
             Key: file.name,
             Body: file,
             ContentType: file.type
         };
 
-        s3.upload(params, (err, data) => {
-            if (err) {
-                showResult('Upload error: ' + err);
-            } else {
-                showResult('Upload successful: ' + JSON.stringify(data, null, 2));
-                listFiles();
-            }
-        });
+        s3.upload(params)
+            .on('httpUploadProgress', (evt) => {
+                const percentComplete = Math.round((evt.loaded * 100) / evt.total);
+                showResult(`Upload progress: ${percentComplete}%`);
+            })
+            .send((err, data) => {
+                if (err) {
+                    showResult('Upload error: ' + err);
+                } else {
+                    showResult('Upload successful: ' + JSON.stringify(data, null, 2));
+                    listFiles();
+                }
+            });
     }
 
     function listFiles() {
