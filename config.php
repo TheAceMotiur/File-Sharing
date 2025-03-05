@@ -11,7 +11,7 @@ define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
 
 function getDBConnection() {
     static $db = null;
-    
+      
     if ($db === null) {
         $host = 'localhost';
         $dbname = 'TheAceMotiur_fileswith';
