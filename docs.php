@@ -160,35 +160,7 @@ $upload = makeRequest($API_URL . "?action=upload", [
 
 $delete = makeRequest($API_URL . "?action=delete&file_id=abc123");'); ?></code></pre>
             </section>
-
-            <!-- S3 Compatible API -->
-            <section class="mb-8">
-                <h2 class="text-2xl font-semibold mb-4">S3 Compatible API</h2>
-                <p class="mb-4">The API is compatible with S3 clients. Use your API key as both the Access Key and Secret Key.</p>
-                
-                <h3 class="text-lg font-semibold mt-4 mb-2">Endpoint</h3>
-                <pre><code class="language-plaintext">https://<?php echo $_SERVER['HTTP_HOST']; ?>/s3</code></pre>
-                
-                <h3 class="text-lg font-semibold mt-4 mb-2">AWS CLI Example</h3>
-                <pre><code class="language-bash">aws s3 ls s3://bucket-name/ \
-    --endpoint-url https://<?php echo $_SERVER['HTTP_HOST']; ?>/s3 \
-    --access-key YOUR_API_KEY \
-    --secret-key YOUR_API_KEY</code></pre>
-                
-                <h3 class="text-lg font-semibold mt-4 mb-2">PHP SDK Example</h3>
-                <pre><code class="language-php"><?php echo htmlspecialchars('use Aws\S3\S3Client;
-
-$s3 = new S3Client([
-    \'version\' => \'latest\',
-    \'region\'  => \'us-east-1\',
-    \'endpoint\' => \'https://' . $_SERVER['HTTP_HOST'] . '/s3\',
-    \'credentials\' => [
-        \'key\'    => \'YOUR_API_KEY\',
-        \'secret\' => \'YOUR_API_KEY\',
-    ],
-    \'use_path_style_endpoint\' => true
-]);'); ?></code></pre>
-            </section>
+            
         </div>
     </div>
 
