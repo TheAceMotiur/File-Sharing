@@ -67,6 +67,11 @@ try {
                     $stmt = $db->prepare("UPDATE users SET premium = NOT premium WHERE id = ?");
                     $stmt->bind_param("i", $userId);
                     $stmt->execute();
+                    
+                    // If admin toggled their own premium status, update their session
+                    if ($userId == $_SESSION['user_id']) {
+                        updatePremiumStatus($_SESSION['user_id'], $db);
+                    }
                     break;
         }
         

@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['user_name'] = $user['name']; 
                         $_SESSION['is_admin'] = $adminResult['is_admin'];
 
+                        // Add this line to store premium status in session
+                        updatePremiumStatus($user['id'], $db);
+
                         // Set session cookie parameters for 30 days
                         $params = session_get_cookie_params();
                         setcookie(session_name(), session_id(), [

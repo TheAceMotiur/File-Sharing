@@ -20,6 +20,7 @@ function checkAuth() {
             if ($user = $result->fetch_assoc()) {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_name'] = $user['name'];
+                updatePremiumStatus($user['id'], $db);
                 return true;
             }
         }
@@ -49,6 +50,25 @@ function checkEmailVerification() {
         }
     } catch (Exception $e) {
         die("Error: " . $e->getMessage());
+    }
+}
+
+// Add this function to update premium status in session
+function updatePremiumStatus($userId, $db) {
+    if (!$userId || !$db) return;
+    
+    try {
+        $stmt = $db->prepare("SELECT premium FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($user = $result->fetch_assoc()) {
+            $_SESSION['user_premium'] = (bool)$user['premium'];
+        }
+    } catch (Exception $e) {
+        // Silent fail - default to non-premium if error
+        $_SESSION['user_premium'] = false;
     }
 }
 ?>

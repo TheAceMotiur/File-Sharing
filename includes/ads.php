@@ -18,9 +18,13 @@ function shouldShowAds() {
     // Don't show ads if globally disabled
     if (!$adsenseEnabled) return false;
     
-    // Check if user is premium (if you have a premium feature)
-    if (isset($_SESSION['premium']) && $_SESSION['premium']) return false;
+    // If user is not logged in, show ads
+    if (!isset($_SESSION['user_id'])) return true;
     
+    // Check if user is premium
+    if (isset($_SESSION['user_premium']) && $_SESSION['user_premium']) return false;
+    
+    // If logged in but not premium, show ads
     return true;
 }
 

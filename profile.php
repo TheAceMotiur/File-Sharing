@@ -13,6 +13,9 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Update premium status
+updatePremiumStatus($_SESSION['user_id'], getDBConnection());
+
 try {
     // Include database configuration and get connection
     $db = getDBConnection();
