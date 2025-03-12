@@ -1,14 +1,5 @@
-CREATE TABLE IF NOT EXISTS folders (
-    id VARCHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    parent_id VARCHAR(36) NULL,
-    user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+-- First, drop the foreign key constraint
+ALTER TABLE file_uploads DROP FOREIGN KEY fk_folder_id;
 
--- Add folder_id to file_uploads table 
-ALTER TABLE file_uploads ADD COLUMN folder_id VARCHAR(36) NULL;
-ALTER TABLE file_uploads ADD CONSTRAINT fk_folder_id FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL;
+-- Then remove the column
+ALTER TABLE file_uploads DROP COLUMN folder_id;
