@@ -845,7 +845,530 @@ function getFileIcon($fileName) {
     <?php include 'footer.php'; ?>
     </div>
 
-    <?php include 'footer.php'; ?>
-    
+    <script>
+        // Close success message
+        function closeSuccessMessage() {
+            document.getElementById('successAlert').classList.add('hidden');
+        }
+        
+        // Vue app for file management
+        document.addEventListener('DOMContentLoaded', function() {
+            const { createApp } = Vue
+            
+            createApp({
+                data() {
+                    return {
+                        // File Explorer State
+                        items: [],
+                        loading: true,
+                        currentFolder: null,
+                        breadcrumbs: [],
+                        
+                        // UI State
+                        showUploadModal: false,
+                        showCreateFolderModal: false,
+                        showDeleteConfirmation: false,
+                        showingContextMenu: false,
+                        dragOver: false,
+                        uploadDragOver: false,
+                        
+                        // Context Menu
+                        contextMenuPosition: { x: 0, y: 0 },
+                        contextMenuItem: {},
+                        
+                        // Upload
+                        filesToUpload: [],
+                        uploadStatus: {},
+                        isUploading: false,
+                        
+                        // Edit/Delete State
+                        editingItem: null,
+                        editingName: '',
+                        deleteItem: null,
+                        
+                        // Preview
+                        previewImage: null,
+                    }
+                },
+                created() {
+                    // Load files when component is created
+                    this.loadFiles();
+                    
+                    // Close context menu when clicking elsewhere
+                    window.addEventListener('click', this.hideContextMenu);
+                    window.addEventListener('keydown', this.handleKeyDown);
+                },
+                beforeUnmount() {
+                    window.removeEventListener('click', this.hideContextMenu);
+                    window.removeEventListener('keydown', this.handleKeyDown);
+                },
+                computed: {
+                    // Split items between folders and files
+                    folderItems() {
+                        return this.items.filter(item => item.type === 'folder');
+                    },
+                    fileItems() {
+                        return this.items.filter(item => item.type === 'file');
+                    }
+                },
+                methods: {
+                    // Files and folders loading
+                    async loadFiles(folderId = null) {
+                        this.loading = true;
+                        try {
+                            const response = await fetch(`/api/folders.php?action=list&parent_id=${folderId || ''}`);
+                            if (!response.ok) throw new Error('Failed to load files');
+                            
+                            const data = await response.json();
+                            this.items = [...data.folders, ...data.files];
+                            this.breadcrumbs = data.breadcrumbs;
+                            this.currentFolder = data.current_folder;
+                            
+                        } catch (error) {
+                            console.error('Error loading files:', error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'Could not load your files. Please try again later.'
+                            });
+                        } finally {
+                            this.loading = false;
+                        }
+                    },
+                    
+                    // Folder navigation
+                    navigateToFolder(folderId) {
+                        this.loadFiles(folderId);
+                    },
+                    
+                    // File operations
+                    handleFileClick(file) {
+                        if (file.is_image) {
+                            this.previewImage = file;
+                        } else {
+                            window.open(`/download/${file.id}`, '_blank');
+                        }
+                    },
+                    
+                    getFileIconHtml(filename) {
+                        // Extract the file extension to determine icon
+                        const extension = filename.split('.').pop().toLowerCase();
+                        
+                        // Create DOM element to parse HTML strings
+                        const parser = new DOMParser();
+                        const icons = <?php echo json_encode(array_map(function($ext) use ($icons) {
+                            return isset($icons[$ext]) ? $icons[$ext]['html'] : $icons['default']['html'];
+                        }, array_merge(array_keys($icons), ['default']))); ?>;
+                        
+                        return icons[extension] || icons['default'];
+                    },
+                    
+                    formatFileSize(bytes) {
+                        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                        let size = bytes;
+                        let unitIndex = 0;
+                        
+                        while (size >= 1024 && unitIndex < units.length - 1) {
+                            size /= 1024;
+                            unitIndex++;
+                        }
+                        
+                        return `${size.toFixed(1)} ${units[unitIndex]}`;
+                    },
+                    
+                    // Context Menu
+                    showContextMenu(event, item) {
+                        event.preventDefault();
+                        this.showingContextMenu = true;
+                        this.contextMenuItem = item;
+                        
+                        // Position the menu
+                        const menuWidth = 160;
+                        const menuHeight = 150;
+                        const windowWidth = window.innerWidth;
+                        const windowHeight = window.innerHeight;
+                        
+                        // Adjust position to ensure menu stays within viewport
+                        let x = event.clientX;
+                        let y = event.clientY;
+                        
+                        if (x + menuWidth > windowWidth) {
+                            x = windowWidth - menuWidth;
+                        }
+                        
+                        if (y + menuHeight > windowHeight) {
+                            y = windowHeight - menuHeight;
+                        }
+                        
+                        this.contextMenuPosition = { x, y };
+                    },
+                    
+                    hideContextMenu() {
+                        this.showingContextMenu = false;
+                    },
+                    
+                    // Folder creation
+                    async createFolder() {
+                        if (!this.newFolderName.trim()) {
+                            return;
+                        }
+                        
+                        try {
+                            const formData = new FormData();
+                            formData.append('name', this.newFolderName);
+                            if (this.currentFolder) {
+                                formData.append('parent_id', this.currentFolder);
+                            }
+                            
+                            const response = await fetch('/api/folders.php?action=create', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                this.items.unshift(data.folder);
+                                this.newFolderName = '';
+                                this.showCreateFolderModal = false;
+                            } else {
+                                throw new Error(data.error || 'Failed to create folder');
+                            }
+                        } catch (error) {
+                            console.error('Error creating folder:', error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: error.message || 'Could not create folder. Please try again.'
+                            });
+                        }
+                    },
+                    
+                    // Rename operations
+                    startRename(item) {
+                        this.editingItem = item;
+                        this.editingName = item.name;
+                        this.$nextTick(() => {
+                            // Focus and select the entire name without extension if it's a file
+                            if (this.$refs.renameInput) {
+                                this.$refs.renameInput.focus();
+                                if (item.type === 'file') {
+                                    const name = item.name;
+                                    const lastDotIndex = name.lastIndexOf('.');
+                                    if (lastDotIndex > 0) {
+                                        // Select only the name part, not the extension
+                                        this.$refs.renameInput.setSelectionRange(0, lastDotIndex);
+                                    }
+                                } else {
+                                    this.$refs.renameInput.select();
+                                }
+                            }
+                        });
+                    },
+                    
+                    cancelRename() {
+                        this.editingItem = null;
+                        this.editingName = '';
+                    },
+                    
+                    async renameItem(item) {
+                        if (!this.editingName.trim() || this.editingName === item.name) {
+                            this.cancelRename();
+                            return;
+                        }
+                        
+                        try {
+                            let url, formData = new FormData();
+                            
+                            if (item.type === 'folder') {
+                                url = '/api/folders.php?action=rename';
+                                formData.append('folder_id', item.id);
+                                formData.append('name', this.editingName);
+                            } else {
+                                // For files, preserve the extension
+                                const oldName = item.name;
+                                const lastDotIndex = oldName.lastIndexOf('.');
+                                let newName = this.editingName;
+                                
+                                if (lastDotIndex > 0) {
+                                    const extension = oldName.substring(lastDotIndex);
+                                    // If user didn't add extension, append it automatically
+                                    if (!newName.endsWith(extension)) {
+                                        newName += extension;
+                                    }
+                                }
+                                
+                                url = '/api/rename.php';
+                                formData.append('file_id', item.id);
+                                formData.append('new_name', newName);
+                                formData.append('action', 'rename');
+                            }
+                            
+                            const response = await fetch(url, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (!response.ok) throw new Error('Failed to rename item');
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                                // Update item in the list
+                                if (item.type === 'folder') {
+                                    item.name = this.editingName;
+                                } else {
+                                    item.name = data.name || this.editingName;
+                                }
+                            } else {
+                                throw new Error(data.error || 'Failed to rename item');
+                            }
+                        } catch (error) {
+                            console.error('Error renaming item:', error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: error.message || 'Could not rename item. Please try again.'
+                            });
+                        } finally {
+                            this.cancelRename();
+                        }
+                    },
+                    
+                    // Delete operations
+                    confirmDeleteItem(item) {
+                        this.deleteItem = item;
+                        this.showDeleteConfirmation = true;
+                    },
+                    
+                    async deleteSelectedItem() {
+                        if (!this.deleteItem) return;
+                        
+                        try {
+                            let url, formData = new FormData();
+                            
+                            if (this.deleteItem.type === 'folder') {
+                                url = '/api/folders.php?action=delete';
+                                formData.append('folder_id', this.deleteItem.id);
+                            } else {
+                                url = '/';
+                                formData.append('file_id', this.deleteItem.id);
+                                formData.append('action', 'delete');
+                            }
+                            
+                            const response = await fetch(url, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (!response.ok) throw new Error('Failed to delete item');
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                                // Remove item from the list
+                                this.items = this.items.filter(item => item.id !== this.deleteItem.id);
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Success',
+                                    text: `${this.deleteItem.type.charAt(0).toUpperCase() + this.deleteItem.type.slice(1)} deleted successfully`,
+                                    showConfirmButton: false,
+                                    timer: 1500
+                                });
+                            } else {
+                                throw new Error(data.error || 'Failed to delete item');
+                            }
+                        } catch (error) {
+                            console.error('Error deleting item:', error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: error.message || 'Could not delete item. Please try again.'
+                            });
+                        } finally {
+                            this.showDeleteConfirmation = false;
+                            this.deleteItem = null;
+                        }
+                    },
+                    
+                    // File upload operations
+                    triggerFileInput() {
+                        this.$refs.fileInput.click();
+                    },
+                    
+                    handleFileInputChange(event) {
+                        this.addFilesToUpload(event.target.files);
+                    },
+                    
+                    handleUploadDrop(event) {
+                        this.uploadDragOver = false;
+                        this.addFilesToUpload(event.dataTransfer.files);
+                    },
+                    
+                    handleFileDrop(event) {
+                        this.dragOver = false;
+                        this.addFilesToUpload(event.dataTransfer.files);
+                        this.uploadFiles();
+                    },
+                    
+                    addFilesToUpload(fileList) {
+                        for (const file of fileList) {
+                            // Skip duplicate files by name
+                            if (!this.filesToUpload.find(f => f.name === file.name)) {
+                                this.filesToUpload.push(file);
+                            }
+                        }
+                    },
+                    
+                    removeFileToUpload(index) {
+                        this.filesToUpload.splice(index, 1);
+                    },
+                    
+                    async uploadFiles() {
+                        if (this.filesToUpload.length === 0 || this.isUploading) return;
+                        
+                        this.isUploading = true;
+                        let uploads = [];
+                        
+                        for (let i = 0; i < this.filesToUpload.length; i++) {
+                            if (this.uploadStatus[i]?.completed) continue;
+                            
+                            // Set initial upload status
+                            this.$set(this.uploadStatus, i, {
+                                uploading: true,
+                                progress: 0,
+                                completed: false,
+                                error: false,
+                                errorMessage: null
+                            });
+                            
+                            const file = this.filesToUpload[i];
+                            const formData = new FormData();
+                            formData.append('files[]', file);
+                            
+                            if (this.currentFolder) {
+                                formData.append('folder_id', this.currentFolder);
+                            }
+                            
+                            uploads.push(this.uploadFile(formData, i));
+                        }
+                        
+                        // Wait for all uploads to complete
+                        await Promise.all(uploads);
+                        
+                        // Reload files to show the new uploads
+                        await this.loadFiles(this.currentFolder);
+                        
+                        // Reset upload state if all were successful
+                        const allCompleted = Object.values(this.uploadStatus).every(status => status.completed);
+                        if (allCompleted) {
+                            setTimeout(() => {
+                                this.filesToUpload = [];
+                                this.uploadStatus = {};
+                                this.showUploadModal = false;
+                                this.isUploading = false;
+                            }, 1500);
+                        } else {
+                            this.isUploading = false;
+                        }
+                    },
+                    
+                    async uploadFile(formData, index) {
+                        try {
+                            const xhr = new XMLHttpRequest();
+                            
+                            // Track progress
+                            xhr.upload.addEventListener('progress', (event) => {
+                                if (event.lengthComputable) {
+                                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                                    this.$set(this.uploadStatus[index], 'progress', percentComplete);
+                                }
+                            });
+                            
+                            // Create a promise to handle the upload
+                            return new Promise((resolve, reject) => {
+                                xhr.open('POST', '/upload.php', true);
+                                
+                                xhr.onload = () => {
+                                    if (xhr.status >= 200 && xhr.status < 300) {
+                                        const response = JSON.parse(xhr.responseText);
+                                        if (response.success) {
+                                            this.$set(this.uploadStatus[index], 'completed', true);
+                                            resolve();
+                                        } else {
+                                            this.$set(this.uploadStatus[index], 'error', true);
+                                            this.$set(this.uploadStatus[index], 'errorMessage', response.errors[0] || 'Upload failed');
+                                            reject(new Error(response.errors[0]));
+                                        }
+                                    } else {
+                                        this.$set(this.uploadStatus[index], 'error', true);
+                                        this.$set(this.uploadStatus[index], 'errorMessage', 'Server error');
+                                        reject(new Error('Server error'));
+                                    }
+                                };
+                                
+                                xhr.onerror = () => {
+                                    this.$set(this.uploadStatus[index], 'error', true);
+                                    this.$set(this.uploadStatus[index], 'errorMessage', 'Network error');
+                                    reject(new Error('Network error'));
+                                };
+                                
+                                xhr.send(formData);
+                            });
+                        } catch (error) {
+                            console.error('Error uploading file:', error);
+                            this.$set(this.uploadStatus[index], 'error', true);
+                            this.$set(this.uploadStatus[index], 'errorMessage', error.message || 'Upload failed');
+                            throw error;
+                        } finally {
+                            this.$set(this.uploadStatus[index], 'uploading', false);
+                        }
+                    },
+                    
+                    cancelUpload() {
+                        if (this.isUploading) return;
+                        this.filesToUpload = [];
+                        this.uploadStatus = {};
+                        this.showUploadModal = false;
+                    },
+                    
+                    // Keyboard navigation
+                    handleKeyDown(event) {
+                        if (event.key === 'Escape') {
+                            if (this.showingContextMenu) {
+                                this.hideContextMenu();
+                            }
+                            if (this.editingItem) {
+                                this.cancelRename();
+                            }
+                            if (this.showUploadModal) {
+                                this.cancelUpload();
+                            }
+                            if (this.showCreateFolderModal) {
+                                this.showCreateFolderModal = false;
+                            }
+                            if (this.showDeleteConfirmation) {
+                                this.showDeleteConfirmation = false;
+                                this.deleteItem = null;
+                            }
+                            if (this.previewImage) {
+                                this.previewImage = null;
+                            }
+                        }
+                    }
+                },
+                mounted() {
+                    // When the modal is shown, focus the folder name input
+                    this.$watch('showCreateFolderModal', (isVisible) => {
+                        if (isVisible) {
+                            this.$nextTick(() => {
+                                this.$refs.folderNameInput?.focus();
+                            });
+                        } else {
+                            this.newFolderName = '';
+                        }
+                    });
+                }
+            }).mount('#app');
+        });
+    </script>
 </body>
 </html>
