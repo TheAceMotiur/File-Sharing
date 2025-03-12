@@ -10,6 +10,17 @@ if (isset($_GET['link'])) {
 
 // Get link from session
 $link = isset($_SESSION['download_link']) ? $_SESSION['download_link'] : '';
+
+// If no link is found, redirect to homepage
+if (empty($link)) {
+    header('Location: /');
+    exit();
+}
+
+// Helper function to get site name
+function getSiteName() {
+    return "FreeNetly";  // Replace with your actual site name function if it exists
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
