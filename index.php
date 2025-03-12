@@ -635,20 +635,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
             </div>
-            
-            <!-- Ad placement after some content -->
-            <div class="ad-container">
-                <?php 
-                // Display ads if not on download page
-                $current_page = basename($_SERVER['PHP_SELF']);
-                $is_download_page = (strpos($current_page, 'download') !== false);
-                
-                if (!$is_download_page) {
-                    displayAdsense();
-                }
-                ?>
-            </div>
-            
         </main>
     </div>
 
