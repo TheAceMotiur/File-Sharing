@@ -534,7 +534,7 @@ try {
                 
                     <!-- Download Button -->
                     <div class="flex justify-center">
-                        <a href="https://freenetly.com/wait.php?link=https://fileswith.com/download/<?php echo urlencode($fileId); ?>/download"
+                        <a href="https://freenetly.com/wait.php?link=https://freenetly.com/download/<?php echo urlencode($fileId); ?>/download"
                            class="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
                             <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
