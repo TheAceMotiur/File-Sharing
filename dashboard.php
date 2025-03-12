@@ -60,6 +60,9 @@ try {
                  LOWER(file_name) LIKE '%.jpeg' OR 
                  LOWER(file_name) LIKE '%.png' OR 
                  LOWER(file_name) LIKE '%.gif' OR 
+                 LOWER(file_name) LIKE '%.webp' 
+            THEN 1 
+            ELSE 0 
         END as is_image
         FROM file_uploads 
         WHERE uploaded_by = ? 
