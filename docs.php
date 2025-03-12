@@ -1,6 +1,13 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
+require_once __DIR__ . '/includes/auth.php';
+session_start();
+
+// Update premium status in session to ensure it's current
+if (isset($_SESSION['user_id'])) {
+    updatePremiumStatus($_SESSION['user_id'], getDBConnection());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

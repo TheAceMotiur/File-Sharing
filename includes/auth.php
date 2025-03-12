@@ -53,7 +53,7 @@ function checkEmailVerification() {
     }
 }
 
-// Add this function to update premium status in session
+// Update this function to update premium status in session
 function updatePremiumStatus($userId, $db) {
     if (!$userId || !$db) return;
     
@@ -64,11 +64,14 @@ function updatePremiumStatus($userId, $db) {
         $result = $stmt->get_result();
         
         if ($user = $result->fetch_assoc()) {
+            // Set both session variables for compatibility across the site
             $_SESSION['user_premium'] = (bool)$user['premium'];
+            $_SESSION['premium'] = (bool)$user['premium']; 
         }
     } catch (Exception $e) {
         // Silent fail - default to non-premium if error
         $_SESSION['user_premium'] = false;
+        $_SESSION['premium'] = false;
     }
 }
 ?>

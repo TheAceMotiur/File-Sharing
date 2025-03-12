@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['user_name'] = $user['name']; 
                         $_SESSION['is_admin'] = $userInfo['is_admin'];
                         $_SESSION['premium'] = $userInfo['premium'];
+                        $_SESSION['user_premium'] = $userInfo['premium']; // Add this line for consistency
 
                         // Set session cookie parameters for 30 days
                         $params = session_get_cookie_params();

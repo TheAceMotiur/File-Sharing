@@ -16,8 +16,9 @@ try {
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc();
     
-    // Update premium status in session to ensure it's current
+    // Update premium status in session to ensure it's current (use both variables)
     $_SESSION['premium'] = $user['premium'];
+    $_SESSION['user_premium'] = $user['premium'];
 
     // Get file statistics
     $stmt = $db->prepare("SELECT 

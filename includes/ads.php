@@ -21,8 +21,11 @@ function shouldShowAds() {
     // If user is not logged in, show ads
     if (!isset($_SESSION['user_id'])) return true;
     
-    // Check if user is premium
-    if (isset($_SESSION['user_premium']) && $_SESSION['user_premium']) return false;
+    // Check if user is premium (check both variables for compatibility)
+    if ((isset($_SESSION['premium']) && $_SESSION['premium']) || 
+        (isset($_SESSION['user_premium']) && $_SESSION['user_premium'])) {
+        return false;
+    }
     
     // If logged in but not premium, show ads
     return true;
