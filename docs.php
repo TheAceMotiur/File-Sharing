@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -17,6 +18,8 @@ require_once __DIR__ . '/config.php';
     <?php include 'header.php'; ?>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <?php displayHorizontalAd(); // Display horizontal ad at the top ?>
+        
         <div class="bg-white rounded-lg shadow-sm p-6">
             <h1 class="text-3xl font-bold mb-8">API Documentation</h1>
 
@@ -161,6 +164,12 @@ $upload = makeRequest($API_URL . "?action=upload", [
 $delete = makeRequest($API_URL . "?action=delete&file_id=abc123");'); ?></code></pre>
             </section>
             
+            <?php displayInArticleAd(); // Display in-article ad within content ?>
+            
+        </div>
+        
+        <div class="mt-8">
+            <?php displayHomepageFeaturedAd(); // Display featured ad at the bottom ?>
         </div>
     </div>
 

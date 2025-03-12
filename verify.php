@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 session_start();
 
 // Include required files
@@ -98,10 +99,12 @@ try {
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50">
     <?php include 'header.php'; ?>
 
-    <div class="min-h-screen flex items-center justify-center">
+    <?php displayHorizontalAd(); // Top ad banner ?>
+
+    <div class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-lg shadow-md w-96">
             <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Email Verification</h2>
             
@@ -148,6 +151,8 @@ try {
             </div>
         </div>
     </div>
+    
+    <?php displayHomepageFeaturedAd(); // Bottom ad banner ?>
 
     <?php include 'footer.php'; ?>
 </body>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 session_start();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -91,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-gray-50">
     <?php include 'header.php'; ?>
 
+    <?php displayHorizontalAd(); // Top ad banner ?>
+
     <div class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-lg shadow-md w-96">
             <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Create Account</h2>
@@ -139,6 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </p>
         </div>
     </div>
+
+    <?php displayHomepageFeaturedAd(); // Bottom ad display ?>
 
     <?php include 'footer.php'; ?>
 </body>

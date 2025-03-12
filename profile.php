@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 session_start();
 require_once __DIR__ . '/includes/auth.php';
 
@@ -84,7 +85,7 @@ try {
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50">
 <?php include 'header.php'; ?>
 
     <div class="container mx-auto px-4 py-8">
@@ -148,7 +149,14 @@ try {
                 </div>
             </form>
         </div>
+        
+        <?php if (!isset($_SESSION['premium']) || !$_SESSION['premium']): ?>
+            <div class="max-w-2xl mx-auto mt-8">
+                <?php displayHorizontalAd(); // Display ad below profile form ?>
+            </div>
+        <?php endif; ?>
     </div>
+    
     <?php include 'footer.php'; ?>
 </body>
 </html>
