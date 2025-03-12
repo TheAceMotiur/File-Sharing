@@ -26,17 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         header("Location: verify");
                         exit;
                     } else {
-                        // Get admin status
-                        $stmt = $db->prepare("SELECT is_admin FROM users WHERE id = ?");
+                        // Get admin status and premium status
+                        $stmt = $db->prepare("SELECT is_admin, premium FROM users WHERE id = ?");
                         $stmt->bind_param("i", $user['id']);
                         $stmt->execute();
-                        $adminResult = $stmt->get_result()->fetch_assoc();
+                        $userInfo = $stmt->get_result()->fetch_assoc();
 
                         // Set session variables
                         session_regenerate_id(true); // Security best practice
                         $_SESSION['user_id'] = $user['id'];
                         $_SESSION['user_name'] = $user['name']; 
-                        $_SESSION['is_admin'] = $adminResult['is_admin'];
+                        $_SESSION['is_admin'] = $userInfo['is_admin'];
+                        $_SESSION['premium'] = $userInfo['premium'];
 
                         // Set session cookie parameters for 30 days
                         $params = session_get_cookie_params();

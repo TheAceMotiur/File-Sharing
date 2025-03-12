@@ -11,10 +11,13 @@ try {
     $db = getDBConnection();
     
     // Get user info
-    $stmt = $db->prepare("SELECT name, email, created_at, email_verified FROM users WHERE id = ?");
+    $stmt = $db->prepare("SELECT name, email, created_at, email_verified, premium FROM users WHERE id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc();
+    
+    // Update premium status in session to ensure it's current
+    $_SESSION['premium'] = $user['premium'];
 
     // Get file statistics
     $stmt = $db->prepare("SELECT 
@@ -57,9 +60,6 @@ try {
                  LOWER(file_name) LIKE '%.jpeg' OR 
                  LOWER(file_name) LIKE '%.png' OR 
                  LOWER(file_name) LIKE '%.gif' OR 
-                 LOWER(file_name) LIKE '%.webp' 
-            THEN 1 
-            ELSE 0 
         END as is_image
         FROM file_uploads 
         WHERE uploaded_by = ? 
@@ -307,8 +307,6 @@ function getFileIcon($fileName) {
         <?php if (!isset($_SESSION['premium']) || !$_SESSION['premium']): ?>
             <?php displayInArticleAd(); // In-article ad shown only to non-premium users ?>
         <?php endif; ?>
-
-        <?php include 'header.php'; ?>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <!-- Welcome Section -->
