@@ -1,79 +1,91 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
+require_once __DIR__ . '/includes/auth.php'; // Add missing include for auth.php
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality if needed
 session_start();
 
+// Redirect if already logged in
+if (isset($_SESSION['user_id'])) {
+    header('Location: dashboard.php');
+    exit;
+}
+
+// Store the redirect URL if provided
+$redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'dashboard.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
+    $email = $_POST['email'] ?? '';
+    $password = $_POST['password'] ?? '';
     $remember = isset($_POST['remember']);
 
     if (empty($email) || empty($password)) {
-        $error = "Both email and password are required";
+        $error = "Email and password are required";
     } else {
         try {
-            // Include database configuration and get connection
+            // Include database configuration
             $db = getDBConnection();
             
+            // Check if user exists and password is correct
             $stmt = $db->prepare("SELECT id, name, password, email_verified FROM users WHERE email = ?");
             $stmt->bind_param("s", $email);
             $stmt->execute();
-            $result = $stmt->get_result();
+            $user = $stmt->get_result()->fetch_assoc();
             
-            if ($user = $result->fetch_assoc()) {
-                if (password_verify($password, $user['password'])) {
-                    if (!$user['email_verified']) {
-                        $_SESSION['user_id'] = $user['id']; // Set session for verification
-                        header("Location: verify");
-                        exit;
-                    } else {
-                        // Get admin status
-                        $stmt = $db->prepare("SELECT is_admin FROM users WHERE id = ?");
-                        $stmt->bind_param("i", $user['id']);
+            if ($user && password_verify($password, $user['password'])) {
+                if (!$user['email_verified']) {
+                    // Store user ID in session for verification
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['redirect_after_verify'] = $redirect;
+                    header("Location: verify.php");
+                    exit;
+                } else {
+                    // Get admin status
+                    $stmt = $db->prepare("SELECT is_admin FROM users WHERE id = ?");
+                    $stmt->bind_param("i", $user['id']);
+                    $stmt->execute();
+                    $adminResult = $stmt->get_result()->fetch_assoc();
+
+                    // Set session variables
+                    session_regenerate_id(true); // Security best practice
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['user_name'] = $user['name']; 
+                    $_SESSION['is_admin'] = $adminResult['is_admin'];
+
+                    // Add this line to store premium status in session
+                    updatePremiumStatus($user['id'], $db);
+
+                    // Set session cookie parameters for 30 days
+                    $params = session_get_cookie_params();
+                    setcookie(session_name(), session_id(), [
+                        'expires' => time() + (30 * 24 * 60 * 60),
+                        'path' => $params['path'],
+                        'domain' => $params['domain'],
+                        'httponly' => true,
+                        'secure' => isset($_SERVER['HTTPS']), // Fix: Set secure flag based on connection type
+                        'samesite' => 'Lax'
+                    ]);
+
+                    if ($remember) {
+                        // Generate remember token
+                        $token = bin2hex(random_bytes(32));
+                        $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+                        
+                        $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires = ? WHERE id = ?");
+                        $stmt->bind_param("ssi", $token, $expires, $user['id']);
                         $stmt->execute();
-                        $adminResult = $stmt->get_result()->fetch_assoc();
-
-                        // Set session variables
-                        session_regenerate_id(true); // Security best practice
-                        $_SESSION['user_id'] = $user['id'];
-                        $_SESSION['user_name'] = $user['name']; 
-                        $_SESSION['is_admin'] = $adminResult['is_admin'];
-
-                        // Add this line to store premium status in session
-                        updatePremiumStatus($user['id'], $db);
-
-                        // Set session cookie parameters for 30 days
-                        $params = session_get_cookie_params();
-                        setcookie(session_name(), session_id(), [
+                        
+                        setcookie('remember_token', $token, [
                             'expires' => time() + (30 * 24 * 60 * 60),
-                            'path' => $params['path'],
-                            'domain' => $params['domain'],
+                            'path' => '/',
+                            'secure' => isset($_SERVER['HTTPS']), // Fix: Set secure flag based on connection type
                             'httponly' => true,
-                            'secure' => false,
                             'samesite' => 'Lax'
                         ]);
-
-                        if ($remember) {
-                            // Generate remember token
-                            $token = bin2hex(random_bytes(32));
-                            $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
-                            
-                            $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires = ? WHERE id = ?");
-                            $stmt->bind_param("ssi", $token, $expires, $user['id']);
-                            $stmt->execute();
-                            
-                            setcookie('remember_token', $token, [
-                                'expires' => time() + (30 * 24 * 60 * 60),
-                                'path' => '/',
-                                'secure' => true,
-                                'httponly' => true,
-                                'samesite' => 'Lax'
-                            ]);
-                        }
-
-                        header("Location: dashboard");
-                        exit;
                     }
+
+                    // Redirect to the original page or dashboard
+                    header("Location: " . $redirect);
+                    exit;
                 }
             }
             $error = "Invalid email or password";
