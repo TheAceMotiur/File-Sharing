@@ -46,6 +46,6 @@ function getSiteName() {
     if ($row = $result->fetch_assoc()) {
         return htmlspecialchars($row['setting_value']);
     }
-    return 'OneNetly'; // Fallback name
+    return 'FreeNetly'; // Fallback name
 }
 ?>
