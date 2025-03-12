@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/ads.php';  // Include ads functionality
 session_start();
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 use Spatie\Dropbox\Client as DropboxClient;
 
 $siteName = getSiteName();
@@ -423,277 +423,407 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="text-xl text-gray-600">
                     Upload and share files with anyone, anywhere.
                 </p>
-            </div>                <?php displayHomepageHeroAd(); ?> <!-- Hero section ad -->
+            </div>
+            
+            <?php displayHomepageHeroAd(); // Display ad below hero section ?>
 
             <!-- Upload Section -->
             <div class="max-w-3xl mx-auto">
                 <?php if (!isset($_SESSION['user_id'])): ?>
-                <?php if (!isset($_SESSION['user_id'])): ?>
-                    <!-- Show login prompt for non-authenticated users -->xl shadow-sm border border-gray-200 p-8">
+                    <!-- Show login prompt for non-authenticated users -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
                         <div class="text-center">
                             <div class="mx-auto h-12 w-12 text-gray-400 mb-4">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"     d="M12 15v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                          d="M12 15v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>svg>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M12 15v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
                             </div>
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">Login Required</h3>or register to upload files</p>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Login Required</h3>
                             <p class="text-gray-600 mb-4">Please login or register to upload files</p>
                             <div class="flex justify-center space-x-4">
-                                <a href="login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" "inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                   class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Login
+                                <a href="login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" 
+                                   class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                                     Login
                                 </a>
-                                <a href="register.php" line-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Register
-                                    Registera>
-                                </a>div>
-                            </div>div>
+                                <a href="register.php" 
+                                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                    Register
+                                </a>
+                            </div>
                         </div>
                     </div>
                 <?php else: ?>
                     <!-- Original upload form for logged-in users -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-                        <form @submit.prevent="uploadFile" method="POST" enctype="multipart/form-data" class="space-y-6">rder-dashed border-gray-300 rounded-xl p-10 text-center transition-colors duration-150 ease-in-out hover:border-blue-500"
+                        <form @submit.prevent="uploadFile" method="POST" enctype="multipart/form-data" class="space-y-6">
                             <div class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center transition-colors duration-150 ease-in-out hover:border-blue-500"
                                  @dragover.prevent 
-                                 @drop.prevent="handleDrop" :class="{ 'border-blue-500 bg-blue-50': uploading }">
+                                 @drop.prevent="handleDrop"
                                  :class="{ 'border-blue-500 bg-blue-50': uploading }">
                                 
-                                <div v-if="!uploading">lor" viewBox="0 0 24 24">
+                                <div v-if="!uploading">
                                     <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                    </svg>e</h3>
-                                    <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>rop or click to select</p>
-                                    <p class="mt-2 text-gray-600">Drag and drop or click to select</p>ray-500">
+                                    </svg>
+                                    <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>
+                                    <p class="mt-2 text-gray-600">Drag and drop or click to select</p>
                                     <div class="mt-2 text-sm text-gray-500">
-                                        Maximum file size: 2 GB<br>pported formats: Images, Audio, Video, Archives
+                                        Maximum file size: 2 GB<br>
                                         Supported formats: Images, Audio, Video, Archives
-                                    </div>lect" ref="fileInput" required>
+                                    </div>
                                     <input type="file" class="hidden" @change="handleFileSelect" ref="fileInput" required>
-                                    <button type="button" @click="$refs.fileInput.click()"  inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                        class="mt-4 inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">t File
-                                        Select Filebutton>
-                                    </button>                                </div>
+                                    <button type="button" @click="$refs.fileInput.click()" 
+                                        class="mt-4 inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                        Select File
+                                    </button>
                                 </div>
 
                                 <div v-else class="space-y-4">
-                                    <div class="w-full bg-gray-200 rounded-full h-3"> transition-all duration-150" 
-                                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-150" style="{ width: progress + '%' }">
-                                             :style="{ width: progress + '%' }">div>
+                                    <div class="w-full bg-gray-200 rounded-full h-3">
+                                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-150" 
+                                             :style="{ width: progress + '%' }">
                                         </div>
-                                    </div>xt-gray-600">
-                                    <p class="text-sm font-medium text-gray-600">Uploading... {{ progress }}%
-                                        Uploading... {{ progress }}%p>
-                                    </p>div>
-                                </div>iv>
-                            </div>form>
+                                    </div>
+                                    <p class="text-sm font-medium text-gray-600">
+                                        Uploading... {{ progress }}%
+                                    </p>
+                                </div>
+                            </div>
                         </form>
-                    </div>                <?php endif; ?>
+                    </div>
                 <?php endif; ?>
-            </div>
-            
-            <?php displayHomepageFeaturedAd(); ?> <!-- Featured ad after upload section -->hite rounded-lg shadow-sm p-6 border border-gray-200">
-b-6">
-            <!-- Features Section -->
-            <div class="py-12">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="lg:text-center">ke-width="2" 
-                        <h2 class="text-base text-indigo-600 font-semibold tracking-wide uppercase">Features</h2>    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">svg>
-                            Everything you need for file sharing</div>
-                        </p>
-                    </div>load Successful!</h3>
- class="text-gray-600">Your file is ready to be shared</p>
-                    <!-- Features content -->        </div>
-                    <!-- ...existing code... -->
-                </div>ion -->
-            </div>
-            gray-700">Share this secure link</label>
-            <?php displayInArticleAd(); ?> <!-- In-article ad at the bottom of the page -->l sm:flex-row gap-3">
 
+                <!-- Success Section with Download Link -->
+                <div v-if="showDownloadSection" class="mt-8">
+                    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="text-center mb-6">
+                            <!-- Success Icon -->
+                            <div class="mx-auto h-12 w-12 text-green-500 mb-4">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            
+                            <h3 class="text-xl font-semibold text-gray-900 mb-2">File Upload Successful!</h3>
+                            <p class="text-gray-600">Your file is ready to be shared</p>
+                        </div>
+                
+                        <!-- Download Link Section -->
+                        <div class="space-y-4">
+                            <label class="block text-sm font-medium text-gray-700">Share this secure link</label>
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <div class="flex-1">
+                                    <input type="text" 
+                                           :value="downloadLink"
+                                           class="w-full px-4 py-2 text-gray-800 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                           readonly
+                                           ref="downloadInput">
+                                </div>
+                                <button @click="copyDownloadLink" 
+                                        class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                    Copy Link
+                                </button>
+                            </div>
+                        </div>
+                
+                        <!-- Quick Actions -->
+                        <div class="mt-6 pt-6 border-t border-gray-200">
+                            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                <a href="/" 
+                                   class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    Upload Another File
+                                </a>
+                                <a :href="downloadLink" target = "_blank"
+                                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    View Download Page
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php displayInArticleAd(); // Display in-article ad ?>
+
+                <!-- Additional Features Section -->
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Existing Secure Sharing Feature -->
+                    <div class="text-center p-6">
+                        <div class="bg-blue-100 rounded-full p-3 inline-flex mx-auto mb-4">
+                            <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold">Secure Sharing</h3>
+                        <p class="text-gray-600 mt-2">Your files are encrypted and protected</p>
+                    </div>
+
+                    <!-- Easy Access Feature -->
+                    <div class="text-center p-6">
+                        <div class="bg-green-100 rounded-full p-3 inline-flex mx-auto mb-4">
+                            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold">Cloud Storage</h3>
+                        <p class="text-gray-600 mt-2">Access your files from anywhere, anytime</p>
+                    </div>
+
+                    <!-- Fast Transfer Feature -->
+                    <div class="text-center p-6">
+                        <div class="bg-purple-100 rounded-full p-3 inline-flex mx-auto mb-4">
+                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold">Fast Transfer</h3>
+                        <p class="text-gray-600 mt-2">Quick and efficient file transfers</p>
+                    </div>
+                </div>
+
+                <?php displayHomepageFeaturedAd(); // Display featured ad before How It Works section ?>
+
+                <!-- How It Works Section -->
+                <div class="mt-16">
+                    <h2 class="text-3xl font-bold text-center text-gray-900 mb-8">How It Works</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                        <!-- Step 1 -->
+                        <div class="text-center">
+                            <div class="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-xl font-bold text-gray-700">1</span>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Upload</h3>
+                            <p class="text-gray-600">Select or drag & drop your files</p>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="text-center">
+                            <div class="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-xl font-bold text-gray-700">2</span>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Get Link</h3>
+                            <p class="text-gray-600">Receive your secure sharing link</p>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="text-center">
+                            <div class="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-xl font-bold text-gray-700">3</span>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Share</h3>
+                            <p class="text-gray-600">Share the link with anyone</p>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="text-center">
+                            <div class="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-xl font-bold text-gray-700">4</span>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Download</h3>
+                            <p class="text-gray-600">Recipients download securely</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <?php displayHorizontalAd(); // Display horizontal ad at the bottom ?>
+            </div>
         </main>
     </div>
--full px-4 py-2 text-gray-800 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+
     <?php include 'footer.php'; ?>
-     ref="downloadInput">
+
     <script>
         const { createApp } = Vue
-        createApp({rder border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
-            data() {4 24">
+        createApp({
+            data() {
                 return {
-                    uploading: false,    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                    uploading: false,
                     progress: 0,
-                    downloadLink: '',Link
-                    showDownloadSection: falsebutton>
-                }div>
-            },        </div>
+                    downloadLink: '',
+                    showDownloadSection: false
+                }
+            },
             methods: {
                 handleDrop(e) {
                     e.preventDefault()
-                    const files = e.dataTransfer.files flex-col sm:flex-row gap-3 justify-center">
+                    const files = e.dataTransfer.files
                     if (files.length) this.uploadFile(files[0])
-                },t text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150">
-                handleFileSelect(e) {4 24">
-                    const files = e.target.files;d" stroke-linejoin="round" stroke-width="2" 
-                    if (files.length) {    d="M12 4v16m8-8H4"/>
+                },
+                handleFileSelect(e) {
+                    const files = e.target.files;
+                    if (files.length) {
                         const file = files[0];
-                        // Add client-side file type validationUpload Another File
+                        // Add client-side file type validation
                         const allowedExtensions = [
                             // Images
-                            'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',ext-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
-                            // Audio4 24">
+                            'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+                            // Audio
                             'mp3', 'wav', 'ogg', 'm4a', 'aac',
-                            // Video    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            // Video
                             'mp4', 'mpeg', 'webm', 'mov', 'avi',
-                            // ArchivesView Download Page
-                            'zip', 'rar', '7z', 'tar', 'gz',a>
-                            // Documentsdiv>
-                            'pdf', 'djvu',div>
-                            // Other mediadiv>
-                            'm3u8', 'm3u'                </div>
+                            // Archives
+                            'zip', 'rar', '7z', 'tar', 'gz',
+                            // Documents
+                            'pdf', 'djvu',
+                            // Other media
+                            'm3u8', 'm3u'
                         ];
                         
-                        const extension = file.name.split('.').pop().toLowerCase();ols-3 gap-6">
-                        if (!allowedExtensions.includes(extension)) {Feature -->
+                        const extension = file.name.split('.').pop().toLowerCase();
+                        if (!allowedExtensions.includes(extension)) {
                             alert('File type not allowed. Only media and archive files are supported.');
                             return;
-                        }ox="0 0 24 24">
+                        }
                         
-                        this.uploadFile(file);    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    }svg>
+                        this.uploadFile(file);
+                    }
                 },
                 
-                async uploadFile(file) { class="text-gray-600 mt-2">Your files are encrypted and protected</p>
-                    if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit                    </div>
+                async uploadFile(file) {
+                    if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit
                         alert('File is too large. Maximum file size is 2 GB.');
                         return;
                     }
                 
-                    this.uploading = true;Box="0 0 24 24">
+                    this.uploading = true;
                     this.progress = 0;
-                    const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);    d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                svg>
+                    const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+                
                     try {
                         NProgress.start();
-                        const chunkSize = 2 * 1024 * 1024; // 2MB chunks class="text-gray-600 mt-2">Access your files from anywhere, anytime</p>
-                        const totalChunks = Math.ceil(file.size / chunkSize);                    </div>
+                        const chunkSize = 2 * 1024 * 1024; // 2MB chunks
+                        const totalChunks = Math.ceil(file.size / chunkSize);
                 
-                        for (let i = 0; i < totalChunks; i++) {>
+                        for (let i = 0; i < totalChunks; i++) {
                             const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
                             const reader = new FileReader();
-                            wBox="0 0 24 24">
-                            try {ejoin="round" stroke-width="2" 
-                                await new Promise((resolve, reject) => {    d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    reader.onload = async () => {svg>
+                            
+                            try {
+                                await new Promise((resolve, reject) => {
+                                    reader.onload = async () => {
                                         try {
                                             const base64Chunk = reader.result.split(',')[1];
-                                            const response = await fetch('index.php', { class="text-gray-600 mt-2">Quick and efficient file transfers</p>
-                                                method: 'POST',div>
-                                                headers: {                </div>
+                                            const response = await fetch('index.php', {
+                                                method: 'POST',
+                                                headers: {
                                                     'Content-Type': 'application/x-www-form-urlencoded',
-                                                },ection -->
+                                                },
                                                 body: new URLSearchParams({
-                                                    chunk: base64Chunk,-900 mb-8">How It Works</h2>
-                                                    totalChunks: totalChunks,id-cols-1 md:grid-cols-4 gap-8">
+                                                    chunk: base64Chunk,
+                                                    totalChunks: totalChunks,
                                                     currentChunk: i,
                                                     fileId: fileId,
-                                                    fileName: file.name,center justify-center mx-auto mb-4">
-                                                    totalSize: file.sizepan class="text-xl font-bold text-gray-700">1</span>
+                                                    fileName: file.name,
+                                                    totalSize: file.size
                                                 })
                                             });
-                 class="text-gray-600">Select or drag & drop your files</p>
-                                            // Check if response is JSON                        </div>
+                
+                                            // Check if response is JSON
                                             const contentType = response.headers.get("content-type");
                                             if (contentType && contentType.indexOf("application/json") !== -1) {
                                                 const result = await response.json();
-                                                if (!result.success) throw new Error(result.error);center justify-center mx-auto mb-4">
-                                            }pan class="text-xl font-bold text-gray-700">2</span>
+                                                if (!result.success) throw new Error(result.error);
+                                            }
                                             
                                             this.progress = Math.round((i + 1) * 100 / totalChunks);
-                                            resolve(); class="text-gray-600">Receive your secure sharing link</p>
-                                        } catch (error) {                        </div>
+                                            resolve();
+                                        } catch (error) {
                                             // If it's the last chunk and we get an error, check if file exists
                                             if (i === totalChunks - 1) {
                                                 // Set success anyway since large files might timeout but upload successfully
-                                                this.downloadLink = `https://${window.location.host}/download/${fileId}`;center justify-center mx-auto mb-4">
-                                                this.showDownloadSection = true;pan class="text-xl font-bold text-gray-700">3</span>
+                                                this.downloadLink = `https://${window.location.host}/download/${fileId}`;
+                                                this.showDownloadSection = true;
                                                 resolve();
                                                 return;
-                                            } class="text-gray-600">Share the link with anyone</p>
-                                            reject(error);                        </div>
+                                            }
+                                            reject(error);
                                         }
                                     };
                                     reader.onerror = reject;
-                                    reader.readAsDataURL(chunk);center justify-center mx-auto mb-4">
-                                });pan class="text-xl font-bold text-gray-700">4</span>
+                                    reader.readAsDataURL(chunk);
+                                });
                             } catch (error) {
                                 // If chunk upload fails but not the last chunk, throw error
-                                if (i !== totalChunks - 1) { class="text-gray-600">Recipients download securely</p>
-                                    throw error;div>
-                                }div>
-                            }div>
-                        }iv>
-                main>
-                        // Set success state    </div>
+                                if (i !== totalChunks - 1) {
+                                    throw error;
+                                }
+                            }
+                        }
+                
+                        // Set success state
                         this.downloadLink = `https://${window.location.host}/download/${fileId}`;
-                        this.showDownloadSection = true;    <?php include 'footer.php'; ?>
+                        this.showDownloadSection = true;
                 
                     } catch (error) {
-                        console.error('Upload error:', error);ateApp } = Vue
+                        console.error('Upload error:', error);
                         alert('Upload failed: ' + error.message);
                     } finally {
                         this.uploading = false;
-                        NProgress.done();alse,
+                        NProgress.done();
                     }
                 },
-                copyDownloadLink() {   showDownloadSection: false
-                    const copyText = this.$refs.downloadInput;  }
+                copyDownloadLink() {
+                    const copyText = this.$refs.downloadInput;
                     const copyBtn = event.target;
                     const originalText = copyBtn.innerHTML;
                     
                     copyText.select();
                     navigator.clipboard.writeText(copyText.value);
-                      if (files.length) this.uploadFile(files[0])
+                    
                     // Update button text and style
                     copyBtn.innerHTML = `
-                        <div class="flex items-center">get.files;
+                        <div class="flex items-center">
                             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>e validation
-                            <span>Copied</span>Extensions = [
+                            </svg>
+                            <span>Copied</span>
                         </div>
-                    `;jpeg', 'png', 'gif', 'webp', 'svg',
+                    `;
                     copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');wav', 'ogg', 'm4a', 'aac',
+                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                     
-                    // Reset button after 1 secondg', 'webm', 'mov', 'avi',
+                    // Reset button after 1 second
                     setTimeout(() => {
-                        copyBtn.innerHTML = originalText;, '7z', 'tar', 'gz',
+                        copyBtn.innerHTML = originalText;
                         copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
                         copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    }, 1000);a
-                }  'm3u8', 'm3u'
-            }];
+                    }, 1000);
+                }
+            }
         }).mount('#app')
-    </script>toLowerCase();
+    </script>
 </body>
-</html>File type not allowed. Only media and archive files are supported.');
-<!-- Add this CSS for better mobile responsiveness -->   return;
-<style>}
+</html>
+<!-- Add this CSS for better mobile responsiveness -->
+<style>
 @media (max-width: 576px) {
-    .input-group {   this.uploadFile(file);
-        flex-direction: column;  }
-    }},
+    .input-group {
+        flex-direction: column;
+    }
     .input-group .form-control {
         border-radius: .25rem !important;
         margin-bottom: 10px;
-    }File is too large. Maximum file size is 2 GB.');
-    .input-group .btn {   return;
-        border-radius: .25rem !important;    }
+    }
+    .input-group .btn {
+        border-radius: .25rem !important;
         width: 100%;
-    }rue;
+    }
 }
-</style></style>
+</style>
