@@ -6,8 +6,8 @@ ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
 ini_set('session.cookie_secure', 1);
 ini_set('session.cookie_httponly', 1);
 
-define('RECAPTCHA_SITE_KEY', '6LfEK8oqAAAAAA4X-xursRqDCIMD4AxPyWjyeIEw');
-define('RECAPTCHA_SECRET_KEY', '6LfEK8oqAAAAAKHB_uMx8EaBW4oaYJnAbTf33HLg');
+define('RECAPTCHA_SITE_KEY', '6Le9P8oqAAAAAE8mla042L3U6G9ti1iZKsGUnork');
+define('RECAPTCHA_SECRET_KEY', '6Le9P8oqAAAAAEZkNLFldwAI2P-3diQv8UK2FVnQ');
 
 function getDBConnection() {
     static $db = null;
