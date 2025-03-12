@@ -52,7 +52,7 @@ function incrementDownloadCount($fileId) {
 // Function to add watermark to file name
 function addWatermark($fileName) {
     $info = pathinfo($fileName);
-    return $info['filename'] . '-[FILESWITH.COM].' . $info['extension'];
+    return $info['filename'] . '-[FREENETLY.COM].' . $info['extension'];
 }
 
 function isImageFile($fileName) {
