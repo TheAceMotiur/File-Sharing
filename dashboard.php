@@ -258,8 +258,6 @@ function getFileIcon($fileName) {
     <link rel="icon" type="image/png" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
     <style>
     .rounded-xl {
         border-radius: 1rem;
@@ -710,27 +708,6 @@ function getFileIcon($fileName) {
                 if (e.key === 'Escape' && !$('#deleteModal').hasClass('hidden')) {
                     $('#deleteModal').addClass('hidden');
                     currentForm = null;
-                }
-            });
-
-            const table = $('#filesTable').DataTable({
-                pageLength: 10,
-                order: [[3, 'desc']],
-                responsive: true,
-                language: {
-                    search: "",
-                    searchPlaceholder: "Search files...", 
-                    lengthMenu: "_MENU_ per page",
-                    emptyTable: "No files uploaded yet"
-                },
-                dom: "<'flex items-center justify-between py-4 px-6'<'flex items-center'l><'flex'f>>" +
-                    "<'overflow-x-auto min-w-full'tr>" +
-                    "<'flex items-center justify-between py-4 px-6'<'flex items-center'i><'flex'p>>",
-                drawCallback: function() {
-                    $('.dataTables_paginate .paginate_button').addClass('px-3 py-1 bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 rounded-md mx-1');
-                    $('.dataTables_paginate .paginate_button.current').addClass('bg-blue-50 text-blue-600 border-blue-500');
-                    $('.dataTables_length select').addClass('rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500');
-                    $('.dataTables_filter input').addClass('rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500');
                 }
             });
 
