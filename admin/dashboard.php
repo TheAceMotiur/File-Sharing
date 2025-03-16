@@ -111,6 +111,36 @@ try {
 } catch (Exception $e) {
     die("Database connection failed: " . $e->getMessage());
 }
+
+// Add this before the HTML output
+$currentPath = isset($_GET['path']) ? trim($_GET['path'], '/') : '';
+$currentFullPath = $currentPath ? "/$currentPath/" : '/';
+
+// Get files for current path
+$files = $db->query("
+    SELECT 
+        fu.*, 
+        u.name as uploader_name,
+        COALESCE(COUNT(fr.id), 0) as report_count
+    FROM file_uploads fu
+    LEFT JOIN users u ON fu.uploaded_by = u.id 
+    LEFT JOIN file_reports fr ON fu.file_id = fr.file_id
+    WHERE fu.dropbox_path LIKE '$currentFullPath%'
+    AND fu.upload_status = 'completed'
+    GROUP BY fu.file_id
+    ORDER BY fu.is_folder DESC, fu.created_at DESC
+")->fetch_all(MYSQLI_ASSOC);
+
+// Process files into folder structure
+$items = [];
+foreach ($files as $file) {
+    $relativePath = trim(str_replace($currentFullPath, '', $file['dropbox_path']), '/');
+    $parts = explode('/', $relativePath);
+    
+    if (count($parts) == 1 || (empty($parts[0]) && count($parts) == 1)) {
+        $items[] = $file;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -329,6 +359,62 @@ try {
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- Replace the files table with this new file manager UI -->
+        <div class="bg-white rounded-lg shadow-sm p-4 lg:p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-800">File Manager</h2>
+                <nav class="flex" aria-label="Breadcrumb">
+                    <ol class="flex items-center space-x-2">
+                        <li>
+                            <a href="?path=" class="text-gray-500 hover:text-gray-700">Root</a>
+                        </li>
+                        <?php if ($currentPath): ?>
+                            <?php 
+                            $parts = explode('/', $currentPath);
+                            $buildPath = '';
+                            foreach ($parts as $part): 
+                                $buildPath .= '/' . $part;
+                            ?>
+                            <li class="flex items-center">
+                                <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                                <a href="?path=<?= trim($buildPath, '/') ?>" class="ml-2 text-gray-500 hover:text-gray-700">
+                                    <?= htmlspecialchars($part) ?>
+                                </a>
+                            </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ol>
+                </nav>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <?php foreach ($items as $item): ?>
+                    <a href="<?= $item['is_folder'] ? '?path=' . trim($currentPath . '/' . $item['file_name'], '/') : '../download.php?id=' . $item['file_id'] ?>" 
+                       class="group relative flex flex-col items-center p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-sm">
+                        <?php if ($item['is_folder']): ?>
+                            <svg class="w-12 h-12 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                            </svg>
+                        <?php else: ?>
+                            <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        <?php endif; ?>
+                        <span class="mt-2 text-sm text-center text-gray-600 group-hover:text-gray-900 truncate max-w-full px-2">
+                            <?= htmlspecialchars($item['file_name']) ?>
+                        </span>
+                        <?php if ($item['report_count'] > 0): ?>
+                            <span class="absolute top-2 right-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full">
+                                <?= $item['report_count'] ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
