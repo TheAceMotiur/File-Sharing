@@ -669,6 +669,38 @@ function getFileIcon($fileName) {
             </div>
         </div>
 
+        <!-- Create Folder Modal -->
+        <div id="createFolderModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Folder</h3>
+                    <form id="createFolderForm" method="POST">
+                        <input type="hidden" name="action" value="create_folder">
+                        <div class="mb-4">
+                            <label for="folder_name" class="block text-sm font-medium text-gray-700">Folder Name</label>
+                            <input type="text" name="folder_name" id="folder_name" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm 
+                                        focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div class="flex items-center justify-end space-x-3">
+                            <button type="button" onclick="closeCreateFolderModal()"
+                                    class="px-4 py-2 bg-white text-gray-700 text-base font-medium rounded-md
+                                        border border-gray-300 shadow-sm hover:bg-gray-50
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                Cancel
+                            </button>
+                            <button type="submit"
+                                    class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md
+                                        shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2
+                                        focus:ring-blue-500">
+                                Create
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <script>
         $(document).ready(function() {
             let currentForm = null;
@@ -813,6 +845,64 @@ function getFileIcon($fileName) {
             if (e.target === this) {
                 closeRenameModal();
             }
+        });
+
+        function createNewFolder() {
+            const modal = document.getElementById('createFolderModal');
+            const folderNameInput = document.getElementById('folder_name');
+            modal.classList.remove('hidden');
+            folderNameInput.value = '';
+            folderNameInput.focus();
+        }
+
+        function closeCreateFolderModal() {
+            const modal = document.getElementById('createFolderModal');
+            modal.classList.add('hidden');
+        }
+
+        // Add event listeners for the create folder modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('createFolderModal');
+            
+            // Close on escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeCreateFolderModal();
+                }
+            });
+
+            // Close on outside click
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeCreateFolderModal();
+                }
+            });
+
+            // Handle form submission
+            document.getElementById('createFolderForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const folderName = document.getElementById('folder_name').value;
+                
+                fetch('/api/folders.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=create_folder&folder_name=${encodeURIComponent(folderName)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        closeCreateFolderModal();
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.error || 'Failed to create folder');
+                    }
+                })
+                .catch(error => {
+                    alert('Error creating folder: ' + error.message);
+                });
+            });
         });
         </script>
     <?php include 'footer.php'; ?>
