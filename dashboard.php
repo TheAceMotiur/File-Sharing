@@ -376,149 +376,145 @@ function getFileIcon($fileName) {
                 <?php displayHomepageFeaturedAd(); // Featured ad before the file listing ?>
             <?php endif; ?>
 
-            <!-- Files Table with Mobile Optimization -->
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-gray-200">
+            <!-- File Manager -->
+            <div class="bg-white rounded-lg shadow-sm">
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
                     <h2 class="text-lg font-semibold text-gray-800">Your Files</h2>
+                    <div class="flex gap-2">
+                        <button onclick="createNewFolder()" 
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            New Folder
+                        </button>
+                        <a href="/" 
+                           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-green-500 hover:bg-green-600">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"/>
+                            </svg>
+                            Upload Files
+                        </a>
+                    </div>
                 </div>
-                
-                <!-- Responsive Table Container -->
-                <div class="w-full overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead>
-                            <tr class="bg-gray-50">
-                                <!-- Mobile-optimized header cells -->
-                                <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    File Name
-                                </th>
-                                <th class="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Size
-                                </th>
-                                <th class="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Uploaded
-                                </th>
-                                <th class="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php foreach ($files as $file): ?>
-                                <tr class="hover:bg-gray-50">
-                                    <!-- Mobile-optimized file name cell -->
-                                    <td class="px-4 sm:px-6 py-4">
-                                        <div class="flex items-center space-x-4">
-                                            <?php $iconData = getFileIcon($file['file_name']); echo $iconData['html']; ?>
-                                            <div class="flex flex-col">
-                                                <div class="font-medium text-gray-900 break-all">
-                                                    <?php echo htmlspecialchars($file['file_name']); ?>
-                                                </div>
-                                                <!-- Show size on mobile -->
-                                                <div class="sm:hidden text-sm text-gray-500">
-                                                    <?php echo number_format($file['size'] / 1024 / 1024, 2); ?> MB
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Hidden on mobile -->
-                                    <td class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <?php echo number_format($file['size'] / 1024 / 1024, 2); ?> MB
-                                    </td>
-                                    
-                                    <!-- Hidden on mobile -->
-                                    <td class="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <?php echo date('M j, Y', strtotime($file['created_at'])); ?>
-                                    </td>
-                                    
-                                    <!-- Mobile-optimized actions cell -->
-                                    <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div class="flex items-center justify-end space-x-3">
-                                            <?php if ($file['is_image']): ?>
-                                            <!-- Preview Button for Images -->
-                                            <button type="button"
-                                                    onclick="previewImage('<?php echo htmlspecialchars($file['file_name']); ?>', '/download/<?php echo $file['file_id']; ?>/download')"
-                                                    title="Preview"
-                                                    class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 
-                                                        rounded-xl text-white bg-gradient-to-br from-purple-500 to-purple-600
-                                                        shadow-sm hover:shadow-md active:scale-95
-                                                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500
-                                                        transform transition-all duration-150 ease-in-out">
-                                                <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                                </svg>
-                                            </button>
-                                            <?php endif; ?>
-                                            
-                                            <!-- Download Button -->
-                                            <a href="download/<?php echo $file['file_id']; ?>" 
-                                            target="_blank"
-                                            title="Download"
-                                            class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 
-                                                    rounded-xl text-white bg-gradient-to-br from-blue-500 to-blue-600
-                                                    shadow-sm hover:shadow-md active:scale-95
-                                                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                                                    transform transition-all duration-150 ease-in-out">
-                                                <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                                </svg>
-                                                <span class="sr-only">Download</span>
-                                            </a>
-                                            
-                                            <!-- Delete Button -->
-                                            <form method="POST" class="inline-block deleteForm" 
-                                                data-file-name="<?php echo htmlspecialchars($file['file_name']); ?>">
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="file_id" value="<?php echo $file['file_id']; ?>">
-                                                <button type="submit" 
-                                                        title="Delete"
-                                                        class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 
-                                                        rounded-xl text-white bg-gradient-to-br from-red-500 to-red-600
-                                                        shadow-sm hover:shadow-md active:scale-95
-                                                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
-                                                        transform transition-all duration-150 ease-in-out">
-                                                    <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                    </svg>
-                                                    <span class="sr-only">Delete</span>
-                                                </button>
-                                            </form>
 
-                                            <!-- Rename Button -->
-                                            <button type="button" 
-                                                    onclick="showRenameModal('<?php echo $file['file_id']; ?>', '<?php echo htmlspecialchars($file['file_name']); ?>')"
-                                                    title="Rename"
-                                                    class="inline-flex items-center justify-center w-9 h-9 text-sm font-medium 
-                                                        rounded-xl text-white bg-gradient-to-br from-indigo-500 to-indigo-600
-                                                        shadow-sm hover:shadow-md active:scale-95
-                                                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
-                                                        transform transition-all duration-150 ease-in-out">
-                                                <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                                </svg>
-                                                <span class="sr-only">Rename</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            
-                            <?php if (empty($files)): ?>
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
-                                        No files uploaded yet
-                                    </td>
-                                </tr>
+                <!-- Grid View -->
+                <div class="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <?php foreach ($files as $file): ?>
+                    <div class="group relative flex flex-col items-center p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all duration-200">
+                        <!-- File Icon -->
+                        <div class="mb-3">
+                            <?php $iconData = getFileIcon($file['file_name']); echo $iconData['html']; ?>
+                        </div>
+                        
+                        <!-- File Name -->
+                        <p class="text-sm text-center font-medium text-gray-700 truncate w-full" title="<?php echo htmlspecialchars($file['file_name']); ?>">
+                            <?php echo htmlspecialchars($file['file_name']); ?>
+                        </p>
+                        
+                        <!-- File Size -->
+                        <p class="text-xs text-gray-500 mt-1">
+                            <?php echo number_format($file['size'] / 1024 / 1024, 2); ?> MB
+                        </p>
+                        
+                        <!-- Quick Actions -->
+                        <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <?php if ($file['is_image']): ?>
+                            <button onclick="previewImage('<?php echo htmlspecialchars($file['file_name']); ?>', '/download/<?php echo $file['file_id']; ?>/download')"
+                                    class="p-1 rounded-full bg-purple-500 text-white hover:bg-purple-600"
+                                    title="Preview">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
                             <?php endif; ?>
-                        </tbody>
-                    </table>
+                            
+                            <button onclick="showRenameModal('<?php echo $file['file_id']; ?>', '<?php echo htmlspecialchars($file['file_name']); ?>')"
+                                    class="p-1 rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                                    title="Rename">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                            </button>
+                            
+                            <form method="POST" class="inline-block deleteForm" data-file-name="<?php echo htmlspecialchars($file['file_name']); ?>">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="file_id" value="<?php echo $file['file_id']; ?>">
+                                <button type="submit" 
+                                        class="p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                        title="Delete">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    
+                    <?php if (empty($files)): ?>
+                    <div class="col-span-full text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900">No files</h3>
+                        <p class="mt-1 text-sm text-gray-500">Get started by uploading a file</p>
+                        <div class="mt-6">
+                            <a href="/" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"/>
+                                </svg>
+                                Upload Files
+                            </a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
+
+                <!-- Pagination -->
+                <?php if ($totalPages > 1): ?>
+                <div class="px-6 py-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <!-- Results info -->
+                        <p class="text-sm text-gray-700">
+                            Showing <span class="font-medium"><?php echo number_format($offset + 1); ?></span> to 
+                            <span class="font-medium"><?php echo number_format(min($offset + $limit, $totalFiles)); ?></span> of 
+                            <span class="font-medium"><?php echo number_format($totalFiles); ?></span> files
+                        </p>
+
+                        <!-- Page numbers -->
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <?php if ($page > 1): ?>
+                                <a href="?page=<?php echo $page - 1; ?>" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                            <?php endif; ?>
+
+                            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                                <a href="?page=<?php echo $i; ?>" 
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium <?php echo $i === $page ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-700 hover:bg-gray-50'; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+
+                            <?php if ($page < $totalPages): ?>
+                                <a href="?page=<?php echo $page + 1; ?>" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                            <?php endif; ?>
+                        </nav>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Pagination Controls -->
