@@ -14,8 +14,8 @@ function getDBConnection() {
       
     if ($db === null) {
         $host = 'localhost';
-        $dbname = 'TheAceMotiur_freenetly';
-        $username = 'TheAceMotiur_freenetly';
+        $dbname = 'onenetly_freenetly';
+        $username = 'onenetly_freenetly';
         $password = 'AmiMotiur27@';
 
         try {
