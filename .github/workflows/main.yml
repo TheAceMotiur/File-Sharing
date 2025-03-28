@@ -11,7 +11,7 @@ jobs:
     - name: 📂 Sync files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: 192.64.115.250
-        username: TheAceMotiur_freenetly
+        server: 66.29.137.14
+        username: onenetly
         password: AmiMotiur27@
-        server-dir: /home/TheAceMotiur_freenetly/public_html/
+        server-dir: /freenetly.com/
