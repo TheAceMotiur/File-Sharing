@@ -25,7 +25,7 @@ try {
     // Log error but continue with logout
     error_log("Logout error: " . $e->getMessage());
 }
-
+ 
 // Always redirect to login
 header('Location: login');
 exit;
