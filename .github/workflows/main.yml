@@ -11,7 +11,7 @@ jobs:
     - name: 📂 Sync files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: vmi2821845.contaboserver.net
+        server: server.onenetly.com
         username: freenetl
-        password: AmiMotiur27@
+        password: 90925f0f77619036
         server-dir: /public_html/
