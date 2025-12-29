@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../config.php';
-session_start();
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -106,7 +105,7 @@ try {
     $dropboxAccounts = $db->query("SELECT COUNT(*) as count FROM dropbox_accounts")->fetch_assoc()['count'];
     $totalStorage = $dropboxAccounts * 2; // 2GB per account
     $usedStorageGB = round(($fileStats['total_size'] / 1024 / 1024 / 1024), 2);
-    $percentUsed = ($usedStorageGB / $totalStorage) * 100;
+    $percentUsed = $totalStorage > 0 ? ($usedStorageGB / $totalStorage) * 100 : 0;
 
 } catch (Exception $e) {
     die("Database connection failed: " . $e->getMessage());

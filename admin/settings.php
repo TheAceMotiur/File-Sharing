@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../config.php';
-session_start();
 
 // Security check
 if (!isset($_SESSION['user_id']) || !$_SESSION['is_admin']) {

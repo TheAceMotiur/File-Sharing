@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../config.php';
-session_start();
 require_once __DIR__ . '/../vendor/autoload.php'; // Add autoloader
 use Spatie\Dropbox\Client as DropboxClient; // Add namespace import
 

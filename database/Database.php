@@ -9,21 +9,20 @@ class Database {
     private $connection;
 
     private function __construct() {
-        $config = require __DIR__ . '/../config.php';
-        $dbConfig = $config['database'];
+        require_once __DIR__ . '/../config.php';
         
         $this->connection = new mysqli(
-            $dbConfig['host'],
-            $dbConfig['username'],
-            $dbConfig['password'],
-            $dbConfig['name']
+            DB_HOST,
+            DB_USER,
+            DB_PASS,
+            DB_NAME
         );
 
         if ($this->connection->connect_error) {
             die("Connection failed: " . $this->connection->connect_error);
         }
 
-        $this->connection->set_charset($dbConfig['charset']);
+        $this->connection->set_charset(DB_CHARSET);
     }
 
     public static function getInstance() {
