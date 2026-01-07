@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/config.php';
-session_start();
 require_once __DIR__ . '/vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
@@ -89,12 +88,50 @@ function streamFileToClient($stream, $filename, $filesize) {
     
     $length = $end - $start + 1;
     
+    // Check if file is an image
+    $isImage = isImageFile($filename);
+    
     // Set headers for resume support
     header('Accept-Ranges: bytes');
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . addWatermark($filename) . '"');
+    
+    // Set proper MIME type for images
+    if ($isImage) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        // Create a temporary resource to detect MIME type
+        $tempStream = tmpfile();
+        $tempPath = stream_get_meta_data($tempStream)['uri'];
+        fseek($stream, 0);
+        $sample = fread($stream, 1024); // Read first 1KB for MIME detection
+        fwrite($tempStream, $sample);
+        fseek($tempStream, 0);
+        $mimeType = finfo_file($finfo, $tempPath);
+        finfo_close($finfo);
+        fclose($tempStream);
+        
+        // If detection fails, use extension-based MIME type
+        if (!$mimeType || $mimeType === 'application/octet-stream') {
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $mimeTypes = [
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'gif' => 'image/gif',
+                'webp' => 'image/webp',
+                'svg' => 'image/svg+xml'
+            ];
+            $mimeType = $mimeTypes[$ext] ?? 'application/octet-stream';
+        }
+        
+        header('Content-Type: ' . $mimeType);
+        header('Content-Disposition: inline; filename="' . addWatermark($filename) . '"');
+        header('Cache-Control: public, max-age=31536000'); // Cache for 1 year
+    } else {
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . addWatermark($filename) . '"');
+        header('Cache-Control: no-cache, must-revalidate');
+    }
+    
     header('Content-Length: ' . $length);
-    header('Cache-Control: no-cache, must-revalidate');
     header('Pragma: public');
     
     // If range requested, return partial content
@@ -155,7 +192,75 @@ try {
         }
     }
 
-    // Set HTTP status code if there's an error
+    // Check if this is a preview request (for images in dashboard)
+    // Handle this BEFORE setting error status codes to allow preview to work
+    $isPreviewRequest = (isset($_GET['preview']) || isset($_REQUEST['preview']) || strpos($_SERVER['REQUEST_URI'], '/preview') !== false);
+    
+    if ($isPreviewRequest && isset($file) && $file && isImageFile($file['file_name'])) {
+        try {
+            // Check if file is stored locally
+            if ($file['storage_location'] === 'local' && !empty($file['local_path']) && file_exists($file['local_path'])) {
+                // Serve preview from local storage
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_file($finfo, $file['local_path']);
+                finfo_close($finfo);
+                
+                header('Content-Type: ' . $mimeType);
+                header('Content-Length: ' . filesize($file['local_path']));
+                header('Cache-Control: public, max-age=3600');
+                readfile($file['local_path']);
+                exit;
+            } else if ($file['storage_location'] === 'dropbox' && !empty($file['dropbox_account_id'])) {
+                // Get Dropbox credentials
+                $stmt = $db->prepare("
+                    SELECT da.access_token 
+                    FROM dropbox_accounts da
+                    INNER JOIN file_uploads fu ON fu.dropbox_account_id = da.id
+                    WHERE fu.file_id = ?
+                ");
+                $stmt->bind_param("s", $fileId);
+                $stmt->execute();
+                $dropbox = $stmt->get_result()->fetch_assoc();
+
+                if ($dropbox) {
+                    $client = new DropboxClient($dropbox['access_token']);
+                    $stream = $client->download($file['dropbox_path']);
+                    
+                    // Determine mime type from extension
+                    $extension = strtolower(pathinfo($file['file_name'], PATHINFO_EXTENSION));
+                    $mimeTypes = [
+                        'jpg' => 'image/jpeg',
+                        'jpeg' => 'image/jpeg',
+                        'png' => 'image/png',
+                        'gif' => 'image/gif',
+                        'webp' => 'image/webp'
+                    ];
+                    $mimeType = $mimeTypes[$extension] ?? 'image/jpeg';
+                    
+                    header('Content-Type: ' . $mimeType);
+                    header('Cache-Control: public, max-age=3600');
+                    fpassthru($stream);
+                    fclose($stream);
+                    exit;
+                }
+            }
+            
+            // If we reach here, preview failed
+            http_response_code(404);
+            header('Content-Type: text/plain');
+            echo 'Preview not available';
+            exit;
+            
+        } catch (Exception $e) {
+            // On error, return error response
+            http_response_code(500);
+            header('Content-Type: text/plain');
+            echo 'Error loading preview: ' . $e->getMessage();
+            exit;
+        }
+    }
+
+    // Set HTTP status code if there's an error (for non-preview requests)
     if (isset($statusCode)) {
         http_response_code($statusCode);
     }
@@ -163,7 +268,41 @@ try {
     // Check if this is a download request
     if (isset($_GET['download'])) {
         try {
-            // Check cache first
+            // For images, check if we should display inline or force download
+            $forceDownload = !isImageFile($file['file_name']);
+            
+            // Check if file is stored locally
+            if ($file['storage_location'] === 'local' && !empty($file['local_path']) && file_exists($file['local_path'])) {
+                // Serve from local storage
+                $filesize = filesize($file['local_path']);
+                
+                // Track download count only for actual downloads
+                if ($forceDownload) {
+                    incrementDownloadCount($fileId);
+                }
+                
+                // For images, serve inline
+                if (!$forceDownload) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mimeType = finfo_file($finfo, $file['local_path']);
+                    finfo_close($finfo);
+                    
+                    header('Content-Type: ' . $mimeType);
+                    header('Content-Length: ' . $filesize);
+                    header('Content-Disposition: inline; filename="' . $file['file_name'] . '"');
+                    header('Cache-Control: public, max-age=3600');
+                    readfile($file['local_path']);
+                    exit;
+                }
+                
+                // For non-images, force download
+                $stream = fopen($file['local_path'], 'rb');
+                streamFileToClient($stream, $file['file_name'], $filesize);
+                fclose($stream);
+                exit;
+            }
+            
+            // Check cache for Dropbox files
             $cachePath = getFileFromCache($fileId);
             
             if ($cachePath && file_exists($cachePath)) {
@@ -271,7 +410,7 @@ try {
         throw new Exception("File not found or has expired. This may be because the file was removed by the owner, exceeded its retention period, or the download link is invalid. Please contact the person who shared the file with you to request a new download link.");
     }
 
-    // Get Dropbox temporary link
+    // Update last download timestamp
     $stmt = $db->prepare("UPDATE file_uploads SET 
         last_download_at = CURRENT_TIMESTAMP,
         expires_at = CURRENT_TIMESTAMP + INTERVAL 180 DAY 
@@ -279,18 +418,12 @@ try {
     $stmt->bind_param("s", $fileId);
     $stmt->execute();
 
-    // Instead of getting Dropbox temporary link, create direct download URL
+    // Create direct download URL
     $directDownloadUrl = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId . "/download";
-    $downloadUrl = $directDownloadUrl; // Use direct download URL instead of Dropbox temporary link
+    $downloadUrl = $directDownloadUrl;
 
     $fileName = htmlspecialchars($file['file_name']);
     $fileSize = number_format($file['size'] / 1024 / 1024, 2);
-
-    // Handle preview requests directly
-    if (isset($_GET['preview']) && isImageFile($fileName)) {
-        header('Location: ' . $directDownloadUrl);
-        exit;
-    }
 
 } catch (Exception $e) {
     // Set error variable instead of using die()

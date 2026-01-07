@@ -1,13 +1,7 @@
 <?php
-// Start output buffering to prevent any output before JSON
-ob_start();
-
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
-
-// Clean any previous output
-ob_end_clean();
 
 // Set JSON response header
 header('Content-Type: application/json');
@@ -52,7 +46,7 @@ if (isset($_POST['chunk'])) {
         }
 
         // Create temporary directory for chunks if not exists
-        $chunksDir = __DIR__ . '/chunks/' . $fileId;
+        $chunksDir = __DIR__ . '/../chunks/' . $fileId;
         if (!file_exists($chunksDir)) {
             mkdir($chunksDir, 0777, true);
         }
@@ -109,7 +103,7 @@ if (isset($_POST['chunk'])) {
                 $db = getDBConnection();
                 
                 // Create uploads directory if not exists
-                $uploadsDir = __DIR__ . '/uploads/' . $fileId;
+                $uploadsDir = __DIR__ . '/../uploads/' . $fileId;
                 if (!file_exists($uploadsDir)) {
                     mkdir($uploadsDir, 0777, true);
                 }
@@ -196,90 +190,40 @@ try {
     // Get folder_id if provided
     $folderId = isset($_POST['folder_id']) && $_POST['folder_id'] !== '' ? (int)$_POST['folder_id'] : null;
 
-    // Handle multiple files - normalize the $_FILES array structure
+    // Handle multiple files
     $files = $_FILES['files'];
-    
-    // Check if it's a single file or multiple files
-    if (is_array($files['name'])) {
-        $fileCount = count($files['name']);
-    } else {
-        // Single file - normalize to array format
-        $files = [
-            'name' => [$files['name']],
-            'type' => [$files['type']],
-            'tmp_name' => [$files['tmp_name']],
-            'error' => [$files['error']],
-            'size' => [$files['size']]
-        ];
-        $fileCount = 1;
-    }
+    $fileCount = count($files['name']);
     
     for ($i = 0; $i < $fileCount; $i++) {
         try {
             // Check for upload errors
             if ($files['error'][$i] !== UPLOAD_ERR_OK) {
-                $errorMsg = 'File upload failed';
-                switch ($files['error'][$i]) {
-                    case UPLOAD_ERR_INI_SIZE:
-                    case UPLOAD_ERR_FORM_SIZE:
-                        $errorMsg = 'File too large';
-                        break;
-                    case UPLOAD_ERR_PARTIAL:
-                        $errorMsg = 'File upload incomplete';
-                        break;
-                    case UPLOAD_ERR_NO_FILE:
-                        $errorMsg = 'No file uploaded';
-                        break;
-                }
-                throw new Exception($errorMsg . ': ' . $files['name'][$i]);
+                throw new Exception('File upload failed: ' . $files['name'][$i]);
             }
 
             // Get file mime type
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mimeType = finfo_file($finfo, $files['tmp_name'][$i]);
             finfo_close($finfo);
-            
-            // Get file extension
-            $extension = strtolower(pathinfo($files['name'][$i], PATHINFO_EXTENSION));
 
             // Validate file type
             $allowedTypes = [
                 // Images
-                'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/jpg',
+                'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
                 // Audio
                 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
                 // Video
                 'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
                 // Archives
                 'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-                'application/x-tar', 'application/gzip', 'application/x-zip-compressed',
+                'application/x-tar', 'application/gzip',
                 // Documents
                 'application/pdf', 'image/vnd.djvu',
                 // Other media
-                'application/vnd.apple.mpegurl', 'application/x-mpegurl',
-                // Octet stream (generic binary)
-                'application/octet-stream'
-            ];
-            
-            $allowedExtensions = [
-                'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
-                'mp3', 'wav', 'ogg', 'm4a', 'aac',
-                'mp4', 'mpeg', 'webm', 'mov', 'avi',
-                'zip', 'rar', '7z', 'tar', 'gz',
-                'pdf', 'djvu',
-                'm3u8', 'm3u'
+                'application/vnd.apple.mpegurl', 'application/x-mpegurl'
             ];
 
-            // Check both MIME type and extension
-            $validMime = in_array($mimeType, $allowedTypes);
-            $validExtension = in_array($extension, $allowedExtensions);
-            
-            if (!$validMime && !$validExtension) {
-                throw new Exception('File type not allowed (MIME: ' . $mimeType . ', Ext: .' . $extension . '): ' . $files['name'][$i]);
-            }
-            
-            // If MIME is octet-stream, rely on extension validation
-            if ($mimeType === 'application/octet-stream' && !$validExtension) {
+            if (!in_array($mimeType, $allowedTypes)) {
                 throw new Exception('File type not allowed: ' . $files['name'][$i]);
             }
 
@@ -292,7 +236,7 @@ try {
             $fileId = uniqid();
             
             // Create uploads directory if not exists
-            $uploadsDir = __DIR__ . '/uploads/' . $fileId;
+            $uploadsDir = __DIR__ . '/../uploads/' . $fileId;
             if (!file_exists($uploadsDir)) {
                 mkdir($uploadsDir, 0777, true);
             }
@@ -303,22 +247,21 @@ try {
             
             // Save file info to database
             $db = getDBConnection();
+            $stmt = $db->prepare("INSERT INTO file_uploads (
+                file_id, 
+                file_name, 
+                size, 
+                upload_status, 
+                local_path,
+                storage_location,
+                uploaded_by,
+                folder_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             
             $status = 'completed';
             $storageLocation = 'local';
             
             if ($folderId) {
-                $stmt = $db->prepare("INSERT INTO file_uploads (
-                    file_id, 
-                    file_name, 
-                    size, 
-                    upload_status, 
-                    local_path,
-                    storage_location,
-                    uploaded_by,
-                    folder_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                
                 $stmt->bind_param("ssisssii",
                     $fileId,
                     $files['name'][$i],
@@ -330,16 +273,6 @@ try {
                     $folderId
                 );
             } else {
-                $stmt = $db->prepare("INSERT INTO file_uploads (
-                    file_id, 
-                    file_name, 
-                    size, 
-                    upload_status, 
-                    local_path,
-                    storage_location,
-                    uploaded_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                
                 $stmt->bind_param("ssisssi",
                     $fileId,
                     $files['name'][$i],
@@ -359,10 +292,7 @@ try {
             ];
 
         } catch (Exception $e) {
-            $errors[] = [
-                'file' => $files['name'][$i],
-                'error' => $e->getMessage()
-            ];
+            $errors[] = $e->getMessage();
         }
     }
     
@@ -370,25 +300,16 @@ try {
         echo json_encode([
             'success' => true,
             'files' => $uploadedFiles,
-            'errors' => $errors,
-            'uploaded_count' => count($uploadedFiles),
-            'error_count' => count($errors)
+            'errors' => $errors
         ]);
     } else {
-        $errorMessages = array_map(function($err) {
-            return is_array($err) ? $err['file'] . ': ' . $err['error'] : $err;
-        }, $errors);
-        throw new Exception('All uploads failed: ' . implode(', ', $errorMessages));
+        throw new Exception(implode(', ', $errors));
     }
 
 } catch (Exception $e) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage(),
-        'debug' => [
-            'files_received' => isset($_FILES['files']),
-            'post_data' => array_keys($_POST)
-        ]
+        'error' => $e->getMessage()
     ]);
 }

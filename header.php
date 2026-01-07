@@ -1,3 +1,8 @@
+<?php
+if (!isset($_SESSION)) {
+    require_once __DIR__ . '/config.php';
+}
+?>
 <div class="relative min-h-screen flex flex-col">
 
         <!-- Main Content -->
@@ -17,7 +22,7 @@
                         <div class="flex items-center space-x-4">
                             <?php if (isset($_SESSION['user_id'])): ?>
                                 <!-- Dashboard Button -->
-                                <a href="/dashboard" class="text-gray-700 hover:text-gray-900 px-3 py-2">
+                                <a href="/dashboard_new.php" class="text-gray-700 hover:text-gray-900 px-3 py-2">
                                     <span class="flex items-center">
                                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 

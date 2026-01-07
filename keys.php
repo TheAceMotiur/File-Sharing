@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/config.php';
-session_start();
 require_once __DIR__ . '/includes/auth.php';
 
 // Check if user is logged in and verified

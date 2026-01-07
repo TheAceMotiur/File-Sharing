@@ -1,300 +1,14 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
-use Spatie\Dropbox\Client as DropboxClient;
+
+// Redirect logged-in users to dashboard
+if (isset($_SESSION['user_id'])) {
+    header('Location: dashboard_new.php');
+    exit;
+}
 
 $siteName = getSiteName();
-
-// Add this helper function before the main request handling
-function removeChunkDirectory($chunksDir) {
-    if (is_dir($chunksDir)) {
-        $files = glob($chunksDir . '/*');
-        foreach ($files as $file) {
-            unlink($file);
-        }
-        rmdir($chunksDir);
-    }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json');
-    
-    // Handle chunk uploads
-    if (isset($_POST['chunk'])) {
-        $chunksDir = '';
-        try {
-            if (!isset($_SESSION['user_id'])) {
-                throw new Exception('Login required to upload files');
-            }
-
-            $chunk = $_POST['chunk'];
-            $totalChunks = $_POST['totalChunks'];
-            $currentChunk = $_POST['currentChunk'];
-            $fileId = $_POST['fileId'];
-            $fileName = $_POST['fileName'];
-            $fileSize = $_POST['totalSize'];
-
-            // Validate total file size (2GB limit)
-            if ($fileSize > 2 * 1024 * 1024 * 1024) {
-                throw new Exception('File size exceeds 2 GB limit');
-            }
-
-            // Create temporary directory for chunks if not exists
-            $chunksDir = __DIR__ . '/chunks/' . $fileId;
-            if (!file_exists($chunksDir)) {
-                mkdir($chunksDir, 0777, true);
-            }
-
-            // Save chunk
-            $chunkFile = $chunksDir . '/' . $currentChunk;
-            file_put_contents($chunkFile, base64_decode($chunk));
-
-            // Check if all chunks are received
-            if ($currentChunk == $totalChunks - 1) {
-                // Combine chunks
-                $finalFile = fopen($chunksDir . '/' . $fileName, 'wb');
-                
-                try {
-                    for ($i = 0; $i < $totalChunks; $i++) {
-                        $chunkContent = file_get_contents($chunksDir . '/' . $i);
-                        if ($chunkContent === false) {
-                            throw new Exception('Failed to read chunk ' . $i);
-                        }
-                        fwrite($finalFile, $chunkContent);
-                        unlink($chunksDir . '/' . $i);
-                    }
-                    fclose($finalFile);
-
-                    // Get file mime type
-                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                    $mimeType = finfo_file($finfo, $chunksDir . '/' . $fileName);
-                    finfo_close($finfo);
-
-                    // Validate file type
-                    $allowedTypes = [
-                        // Images
-                        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-                        // Audio
-                        'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
-                        // Video
-                        'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-                        // Archives
-                        'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-                        'application/x-tar', 'application/gzip',
-                        // Documents
-                        'application/pdf', 'image/vnd.djvu',
-                        // Other media
-                        'application/vnd.apple.mpegurl', 'application/x-mpegurl'
-                    ];
-
-                    if (!in_array($mimeType, $allowedTypes)) {
-                        // Cleanup and throw error
-                        removeChunkDirectory($chunksDir);
-                        throw new Exception('File type not allowed');
-                    }
-
-                    // Upload to Dropbox
-                    $db = getDBConnection();
-                    $dropbox = $db->query("
-                        SELECT da.*, 
-                               COALESCE(SUM(fu.size), 0) as used_storage
-                        FROM dropbox_accounts da
-                        LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
-                            AND fu.upload_status = 'completed'
-                        GROUP BY da.id
-                        HAVING used_storage < 2147483648 OR used_storage IS NULL
-                        LIMIT 1
-                    ")->fetch_assoc();
-
-                    if (!$dropbox) {
-                        throw new Exception('No storage available');
-                    }
-
-                    $client = new Spatie\Dropbox\Client($dropbox['access_token']);
-                    $dropboxPath = "/{$fileId}/{$fileName}";
-                    
-                    // Upload to Dropbox using chunks
-                    $handle = fopen($chunksDir . '/' . $fileName, 'rb');
-                    $cursor = $client->uploadSessionStart(fread($handle, 1024 * 1024 * 10));
-                    
-                    while (!feof($handle)) {
-                        $client->uploadSessionAppend(fread($handle, 1024 * 1024 * 10), $cursor);
-                    }
-                    
-                    $client->uploadSessionFinish('', $cursor, $dropboxPath);
-                    fclose($handle);
-
-                    // Save to database
-                    $stmt = $db->prepare("INSERT INTO file_uploads (
-                        file_id, file_name, size, upload_status, dropbox_path, 
-                        dropbox_account_id, uploaded_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    
-                    $status = 'completed';
-                    $stmt->bind_param("ssissii", 
-                        $fileId,
-                        $fileName,
-                        $fileSize,
-                        $status,
-                        $dropboxPath,
-                        $dropbox['id'],
-                        $_SESSION['user_id']
-                    );
-                    $stmt->execute();
-
-                    // Cleanup
-                    removeChunkDirectory($chunksDir);
-
-                    echo json_encode([
-                        'success' => true,
-                        'downloadLink' => "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId
-                    ]);
-                    exit;
-                } catch (Exception $e) {
-                    if (is_resource($finalFile)) {
-                        fclose($finalFile);
-                    }
-                    removeChunkDirectory($chunksDir);
-                    throw $e;
-                }
-            }
-
-            echo json_encode(['success' => true, 'chunk' => $currentChunk]);
-            exit;
-
-        } catch (Exception $e) {
-            // Clean up on error
-            if (!empty($chunksDir)) {
-                removeChunkDirectory($chunksDir);
-            }
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-            exit;
-        }
-    }
-
-    // Check if user is logged in
-    if (!isset($_SESSION['user_id'])) {
-        header('Content-Type: application/json');
-        http_response_code(401);
-        echo json_encode([
-            'success' => false,
-            'error' => 'Login required to upload files'
-        ]);
-        exit;
-    }
-
-    header('Content-Type: application/json');
-    try {
-        if (!isset($_FILES['file'])) {
-            throw new Exception('No file uploaded');
-        }
-
-        $file = $_FILES['file'];
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('File upload failed');
-        }
-
-        // Add allowed file types
-        $allowedTypes = [
-            // Images
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-            // Audio
-            'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac',
-            // Video
-            'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-            // Archives
-            'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-            'application/x-tar', 'application/gzip',
-            // Documents
-            'application/pdf', 'image/vnd.djvu',
-            // Other media
-            'application/vnd.apple.mpegurl', 'application/x-mpegurl'
-        ];
-
-        // Get file mime type
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $file['tmp_name']);
-        finfo_close($finfo);
-
-        if (!in_array($mimeType, $allowedTypes)) {
-            throw new Exception('File type not allowed. Only media and archive files are supported.');
-        }
-
-        // Add size validation (2GB = 2 * 1024 * 1024 * 1024 bytes)
-        if ($file['size'] > 2 * 1024 * 1024 * 1024) {
-            throw new Exception('File size exceeds 2 GB limit');
-        }
-
-        // Get Dropbox credentials with available storage
-        $db = getDBConnection();
-        $dropbox = $db->query("
-            SELECT da.*, 
-                   COALESCE(SUM(fu.size), 0) as used_storage
-            FROM dropbox_accounts da
-            LEFT JOIN file_uploads fu ON fu.dropbox_account_id = da.id 
-                AND fu.upload_status = 'completed'
-            GROUP BY da.id
-            HAVING used_storage < 2147483648 OR used_storage IS NULL
-            LIMIT 1
-        ")->fetch_assoc();
-
-        if (!$dropbox) {
-            throw new Exception('No Dropbox account with available storage');
-        }
-
-        // Initialize Dropbox client with the selected account
-        $client = new Spatie\Dropbox\Client($dropbox['access_token']);
-        
-        // Generate unique file ID
-        $fileId = uniqid();
-        
-        // Upload to Dropbox
-        $dropboxPath = "/{$fileId}/{$file['name']}";
-        $fileContents = file_get_contents($file['tmp_name']);
-        $client->upload($dropboxPath, $fileContents, 'add');
-        
-        // Save file info to database with the selected Dropbox account
-        $stmt = $db->prepare("INSERT INTO file_uploads (
-            file_id, 
-            file_name, 
-            size, 
-            upload_status, 
-            dropbox_path, 
-            dropbox_account_id, 
-            uploaded_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        
-        $status = 'completed';
-        $stmt->bind_param("ssissii", 
-            $fileId,
-            $file['name'],
-            $file['size'],
-            $status,
-            $dropboxPath,
-            $dropbox['id'],
-            $_SESSION['user_id']
-        );
-        $stmt->execute();
-
-        $downloadLink = "https://" . $_SERVER['HTTP_HOST'] . "/download/" . $fileId;        
-        
-        echo json_encode([
-            'success' => true,
-            'downloadLink' => $downloadLink
-        ]);
-        exit;
-
-    } catch (Exception $e) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'error' => $e->getMessage()
-        ]);
-        exit;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -380,9 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <!-- Resources -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -412,8 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-gray-50">
 <?php include 'header.php'; ?>
 
-    <div id="app" class="min-h-screen">
-        <main class="container mx-auto px-4 py-12">
+    <main class="container mx-auto px-4 py-12">
             <!-- Hero Section -->
             <div class="text-center mb-12">
                 <h1 class="text-4xl font-bold text-gray-900 mb-4">
@@ -428,130 +139,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Upload Section -->
             <div class="max-w-3xl mx-auto">
-                <?php if (!isset($_SESSION['user_id'])): ?>
-                    <!-- Show login prompt for non-authenticated users -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-                        <div class="text-center">
-                            <div class="mx-auto h-12 w-12 text-gray-400 mb-4">
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                          d="M12 15v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">Login Required</h3>
-                            <p class="text-gray-600 mb-4">Please login or register to upload files</p>
-                            <div class="flex justify-center space-x-4">
-                                <a href="login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" 
-                                   class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                    Login
-                                </a>
-                                <a href="register.php" 
-                                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    Register
-                                </a>
-                            </div>
+                <!-- Show login prompt for non-authenticated users -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <div class="text-center">
+                        <div class="mx-auto h-16 w-16 text-blue-600 mb-4">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
                         </div>
-                    </div>
-                <?php else: ?>
-                    <!-- Original upload form for logged-in users -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-                        <form @submit.prevent="uploadFile" method="POST" enctype="multipart/form-data" class="space-y-6">
-                            <div class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center transition-colors duration-150 ease-in-out hover:border-blue-500"
-                                 @dragover.prevent 
-                                 @drop.prevent="handleDrop"
-                                 :class="{ 'border-blue-500 bg-blue-50': uploading }">
-                                
-                                <div v-if="!uploading">
-                                    <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                    </svg>
-                                    <h3 class="mt-4 text-lg font-medium text-gray-900">Upload your file</h3>
-                                    <p class="mt-2 text-gray-600">Drag and drop or click to select</p>
-                                    <div class="mt-2 text-sm text-gray-500">
-                                        Maximum file size: 2 GB<br>
-                                        Supported formats: Images, Audio, Video, Archives
-                                    </div>
-                                    <input type="file" class="hidden" @change="handleFileSelect" ref="fileInput" required>
-                                    <button type="button" @click="$refs.fileInput.click()" 
-                                        class="mt-4 inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                        Select File
-                                    </button>
-                                </div>
-
-                                <div v-else class="space-y-4">
-                                    <div class="w-full bg-gray-200 rounded-full h-3">
-                                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-150" 
-                                             :style="{ width: progress + '%' }">
-                                        </div>
-                                    </div>
-                                    <p class="text-sm font-medium text-gray-600">
-                                        Uploading... {{ progress }}%
-                                    </p>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Success Section with Download Link -->
-                <div v-if="showDownloadSection" class="mt-8">
-                    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                        <div class="text-center mb-6">
-                            <!-- Success Icon -->
-                            <div class="mx-auto h-12 w-12 text-green-500 mb-4">
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                            
-                            <h3 class="text-xl font-semibold text-gray-900 mb-2">File Upload Successful!</h3>
-                            <p class="text-gray-600">Your file is ready to be shared</p>
-                        </div>
-                
-                        <!-- Download Link Section -->
-                        <div class="space-y-4">
-                            <label class="block text-sm font-medium text-gray-700">Share this secure link</label>
-                            <div class="flex flex-col sm:flex-row gap-3">
-                                <div class="flex-1">
-                                    <input type="text" 
-                                           :value="downloadLink"
-                                           class="w-full px-4 py-2 text-gray-800 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                                           readonly
-                                           ref="downloadInput">
-                                </div>
-                                <button @click="copyDownloadLink" 
-                                        class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-                                    </svg>
-                                    Copy Link
-                                </button>
-                            </div>
-                        </div>
-                
-                        <!-- Quick Actions -->
-                        <div class="mt-6 pt-6 border-t border-gray-200">
-                            <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                                <a href="/" 
-                                   class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    Upload Another File
-                                </a>
-                                <a :href="downloadLink" target = "_blank"
-                                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-150">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                    </svg>
-                                    View Download Page
-                                </a>
-                            </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Upload & Share Files</h3>
+                        <p class="text-gray-600 mb-6">Please login or register to start uploading and managing your files</p>
+                        <div class="flex justify-center space-x-4">
+                            <a href="login.php?redirect=dashboard_new.php" 
+                               class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-sign-in-alt mr-2"></i>
+                                Login
+                            </a>
+                            <a href="register.php" 
+                               class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-user-plus mr-2"></i>
+                                Register
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -644,185 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php displayHorizontalAd(); // Display horizontal ad at the bottom ?>
             </div>
         </main>
-    </div>
 
     <?php include 'footer.php'; ?>
-
-    <script>
-        const { createApp } = Vue
-        createApp({
-            data() {
-                return {
-                    uploading: false,
-                    progress: 0,
-                    downloadLink: '',
-                    showDownloadSection: false
-                }
-            },
-            methods: {
-                handleDrop(e) {
-                    e.preventDefault()
-                    const files = e.dataTransfer.files
-                    if (files.length) this.uploadFile(files[0])
-                },
-                handleFileSelect(e) {
-                    const files = e.target.files;
-                    if (files.length) {
-                        const file = files[0];
-                        // Add client-side file type validation
-                        const allowedExtensions = [
-                            // Images
-                            'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
-                            // Audio
-                            'mp3', 'wav', 'ogg', 'm4a', 'aac',
-                            // Video
-                            'mp4', 'mpeg', 'webm', 'mov', 'avi',
-                            // Archives
-                            'zip', 'rar', '7z', 'tar', 'gz',
-                            // Documents
-                            'pdf', 'djvu',
-                            // Other media
-                            'm3u8', 'm3u'
-                        ];
-                        
-                        const extension = file.name.split('.').pop().toLowerCase();
-                        if (!allowedExtensions.includes(extension)) {
-                            alert('File type not allowed. Only media and archive files are supported.');
-                            return;
-                        }
-                        
-                        this.uploadFile(file);
-                    }
-                },
-                
-                async uploadFile(file) {
-                    if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit
-                        alert('File is too large. Maximum file size is 2 GB.');
-                        return;
-                    }
-                
-                    this.uploading = true;
-                    this.progress = 0;
-                    const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2);
-                
-                    try {
-                        NProgress.start();
-                        const chunkSize = 2 * 1024 * 1024; // 2MB chunks
-                        const totalChunks = Math.ceil(file.size / chunkSize);
-                
-                        for (let i = 0; i < totalChunks; i++) {
-                            const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
-                            const reader = new FileReader();
-                            
-                            try {
-                                await new Promise((resolve, reject) => {
-                                    reader.onload = async () => {
-                                        try {
-                                            const base64Chunk = reader.result.split(',')[1];
-                                            const response = await fetch('index.php', {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                                },
-                                                body: new URLSearchParams({
-                                                    chunk: base64Chunk,
-                                                    totalChunks: totalChunks,
-                                                    currentChunk: i,
-                                                    fileId: fileId,
-                                                    fileName: file.name,
-                                                    totalSize: file.size
-                                                })
-                                            });
-                
-                                            // Check if response is JSON
-                                            const contentType = response.headers.get("content-type");
-                                            if (contentType && contentType.indexOf("application/json") !== -1) {
-                                                const result = await response.json();
-                                                if (!result.success) throw new Error(result.error);
-                                            }
-                                            
-                                            this.progress = Math.round((i + 1) * 100 / totalChunks);
-                                            resolve();
-                                        } catch (error) {
-                                            // If it's the last chunk and we get an error, check if file exists
-                                            if (i === totalChunks - 1) {
-                                                // Set success anyway since large files might timeout but upload successfully
-                                                this.downloadLink = `https://${window.location.host}/download/${fileId}`;
-                                                this.showDownloadSection = true;
-                                                resolve();
-                                                return;
-                                            }
-                                            reject(error);
-                                        }
-                                    };
-                                    reader.onerror = reject;
-                                    reader.readAsDataURL(chunk);
-                                });
-                            } catch (error) {
-                                // If chunk upload fails but not the last chunk, throw error
-                                if (i !== totalChunks - 1) {
-                                    throw error;
-                                }
-                            }
-                        }
-                
-                        // Set success state
-                        this.downloadLink = `https://${window.location.host}/download/${fileId}`;
-                        this.showDownloadSection = true;
-                
-                    } catch (error) {
-                        console.error('Upload error:', error);
-                        alert('Upload failed: ' + error.message);
-                    } finally {
-                        this.uploading = false;
-                        NProgress.done();
-                    }
-                },
-                copyDownloadLink() {
-                    const copyText = this.$refs.downloadInput;
-                    const copyBtn = event.target;
-                    const originalText = copyBtn.innerHTML;
-                    
-                    copyText.select();
-                    navigator.clipboard.writeText(copyText.value);
-                    
-                    // Update button text and style
-                    copyBtn.innerHTML = `
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span>Copied</span>
-                        </div>
-                    `;
-                    copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-                    
-                    // Reset button after 1 second
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalText;
-                        copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                        copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    }, 1000);
-                }
-            }
-        }).mount('#app')
-    </script>
 </body>
 </html>
-<!-- Add this CSS for better mobile responsiveness -->
-<style>
-@media (max-width: 576px) {
-    .input-group {
-        flex-direction: column;
-    }
-    .input-group .form-control {
-        border-radius: .25rem !important;
-        margin-bottom: 10px;
-    }
-    .input-group .btn {
-        border-radius: .25rem !important;
-        width: 100%;
-    }
-}
-</style>
