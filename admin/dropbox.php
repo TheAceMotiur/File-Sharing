@@ -163,7 +163,6 @@ try {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         
         $tokenResponse = curl_exec($ch);
-        curl_close($ch);
         
         $tokens = json_decode($tokenResponse, true);
         if (isset($tokens['access_token'])) {
@@ -189,12 +188,9 @@ try {
         
         if ($response === false) {
             $error = curl_error($ch);
-            curl_close($ch);
             error_log("Dropbox API Error: " . $error);
             return null;
         }
-        
-        curl_close($ch);
         
         $spaceInfo = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
