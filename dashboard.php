@@ -1059,12 +1059,12 @@ try {
                 if (file.is_image) {
                     this.previewImage = file;
                 } else {
-                    window.open(`/download/${file.id}`, '_blank');
+                    window.location.href = `/download/${file.id}`;
                 }
             },
             
             downloadFile(file) {
-                window.open(`/download/${file.id}`, '_blank');
+                window.location.href = `/download/${file.id}`;
             },
             
             // Upload
