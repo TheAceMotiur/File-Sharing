@@ -1,14 +1,14 @@
 # Enable rewrite engine
 RewriteEngine On
 
-# Base rewrite rules for pretty URLs
-RewriteCond %{THE_REQUEST} \ /+download\.php\?id=([a-zA-Z0-9]+)\ HTTP
-RewriteRule ^ /download/%1? [L,R=301]
+# Base rewrite rules for pretty URLs - only redirect if directly accessing download.php
+RewriteCond %{THE_REQUEST} \ /+download\.php\?id=([a-zA-Z0-9]+)
+RewriteRule ^download\.php$ /download/%1? [L,R=301]
 
 # Internal rewrites for download URLs 
-RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L]
-RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L]
-RewriteRule ^download/([a-zA-Z0-9]+)/preview$ download.php?id=$1&preview=1 [L]
+RewriteRule ^download/([a-zA-Z0-9]+)$ download.php?id=$1 [L,QSA]
+RewriteRule ^download/([a-zA-Z0-9]+)/download$ download.php?id=$1&download=1 [L,QSA]
+RewriteRule ^download/([a-zA-Z0-9]+)/preview$ download.php?id=$1&preview=1 [L,QSA]
 
 # Enable compression
 <IfModule mod_deflate.c>
