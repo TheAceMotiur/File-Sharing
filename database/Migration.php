@@ -55,9 +55,12 @@ class Migration {
         
         try {
             if ($this->db->multi_query($sql)) {
+                // Clear all result sets
                 do {
-                    while ($this->db->more_results() && $this->db->next_result());
-                } while ($this->db->more_results());
+                    if ($result = $this->db->store_result()) {
+                        $result->free();
+                    }
+                } while ($this->db->next_result());
                 
                 // First try to update the existing record
                 $stmt = $this->db->prepare("UPDATE migrations SET checksum = ? WHERE migration = ?");
