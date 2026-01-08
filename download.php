@@ -105,7 +105,6 @@ function streamFileToClient($stream, $filename, $filesize) {
         fwrite($tempStream, $sample);
         fseek($tempStream, 0);
         $mimeType = finfo_file($finfo, $tempPath);
-        finfo_close($finfo);
         fclose($tempStream);
         
         // If detection fails, use extension-based MIME type
@@ -203,7 +202,6 @@ try {
                 // Serve preview from local storage
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 $mimeType = finfo_file($finfo, $file['local_path']);
-                finfo_close($finfo);
                 
                 header('Content-Type: ' . $mimeType);
                 header('Content-Length: ' . filesize($file['local_path']));
@@ -266,7 +264,7 @@ try {
     }
 
     // Check if this is a download request
-    if (isset($_GET['download'])) {
+    if (isset($_GET['download']) && isset($file) && $file) {
         try {
             // For images, check if we should display inline or force download
             $forceDownload = !isImageFile($file['file_name']);
@@ -285,7 +283,6 @@ try {
                 if (!$forceDownload) {
                     $finfo = finfo_open(FILEINFO_MIME_TYPE);
                     $mimeType = finfo_file($finfo, $file['local_path']);
-                    finfo_close($finfo);
                     
                     header('Content-Type: ' . $mimeType);
                     header('Content-Length: ' . $filesize);
