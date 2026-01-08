@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/ads.php'; // Include ads functionality
 
 // Redirect logged-in users to dashboard
 if (isset($_SESSION['user_id'])) {
-    header('Location: dashboard_new.php');
+    header('Location: dashboard.php');
     exit;
 }
 
@@ -151,7 +151,7 @@ $siteName = getSiteName();
                         <h3 class="text-2xl font-bold text-gray-900 mb-3">Upload & Share Files</h3>
                         <p class="text-gray-600 mb-6">Please login or register to start uploading and managing your files</p>
                         <div class="flex justify-center space-x-4">
-                            <a href="login.php?redirect=dashboard_new.php" 
+                            <a href="login.php?redirect=dashboard.php" 
                                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors">
                                 <i class="fas fa-sign-in-alt mr-2"></i>
                                 Login

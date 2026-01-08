@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+// Redirect if already logged in
+if (isLoggedIn()) {
+    header('Location: dashboard.php');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
