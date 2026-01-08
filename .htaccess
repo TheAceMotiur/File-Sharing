@@ -16,7 +16,8 @@ RewriteRule ^download/([a-zA-Z0-9]+)/preview$ download.php?id=$1&preview=1 [L]
     AddOutputFilterByType DEFLATE text/html text/plain text/xml application/json
 </IfModule>
 
-# Remove .php extension
+# Remove .php extension - but skip download URLs
+RewriteCond %{REQUEST_URI} !^/download/
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}.php -f
 RewriteRule ^([^/]+)/?$ $1.php [L]
