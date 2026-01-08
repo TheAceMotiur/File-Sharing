@@ -74,7 +74,6 @@ if (isset($_POST['chunk'])) {
                 // Get file mime type
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 $mimeType = finfo_file($finfo, $chunksDir . '/' . $fileName);
-                finfo_close($finfo);
 
                 // Validate file type
                 $allowedTypes = [
@@ -204,7 +203,6 @@ try {
             // Get file mime type
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mimeType = finfo_file($finfo, $files['tmp_name'][$i]);
-            finfo_close($finfo);
 
             // Validate file type
             $allowedTypes = [
