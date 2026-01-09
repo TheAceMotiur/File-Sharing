@@ -8,7 +8,7 @@ return [
         'user' => 'root',
         'password' => 'AmiMotiur27@',
         'charset' => 'utf8mb4',
-    ],
+    ], 
     
     // Site Configuration
     'site' => [
