@@ -10,7 +10,7 @@ SET @column_exists = (
 );
 
 SET @sql = IF(@column_exists = 0,
-    'ALTER TABLE file_uploads ADD COLUMN dropbox_path TEXT AFTER folder_id',
+    'ALTER TABLE file_uploads ADD COLUMN dropbox_path TEXT AFTER mime_type',
     'SELECT "Column dropbox_path already exists, skipping..." AS message'
 );
 
