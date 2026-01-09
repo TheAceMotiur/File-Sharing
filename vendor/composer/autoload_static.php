@@ -10,6 +10,7 @@ class ComposerStaticInit830897fd366a5032eaabbadf630844ca
         '7b11c4dc42b3b3023073cb14e519683c' => __DIR__ . '/..' . '/ralouphie/getallheaders/src/getallheaders.php',
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
         '37a3dc5111fe8f707ab4c132ef1dbc62' => __DIR__ . '/..' . '/guzzlehttp/guzzle/src/functions_include.php',
+        '1e156bf22df0d25e4dcddc3e8c2d8b00' => __DIR__ . '/../..' . '/database/Database.php',
     );
 
     public static $prefixLengthsPsr4 = array (
@@ -72,7 +73,7 @@ class ComposerStaticInit830897fd366a5032eaabbadf630844ca
         ),
         'App\\' => 
         array (
-            0 => __DIR__ . '/../..' . '/includes/App',
+            0 => __DIR__ . '/../..' . '/app',
         ),
     );
 

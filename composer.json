@@ -2,8 +2,11 @@
     "name": "fileswith/database",
     "autoload": {
         "psr-4": {
-            "App\\": "includes/App/"
-        }
+            "App\\": "app/"
+        },
+        "files": [
+            "database/Database.php"
+        ]
     },
     "require": {
         "php": ">=7.4",

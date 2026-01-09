@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 use Spatie\Dropbox\Client as DropboxClient;
 
@@ -7,36 +7,51 @@ try {
     $db = getDBConnection();
     
     // 1. Delete expired files (older than 180 days)
-    $stmt = $db->query("SELECT fu.file_id, fu.file_name, fu.upload_status 
+    $stmt = $db->query("SELECT fu.id, fu.unique_id, fu.original_name, fu.stored_name, fu.dropbox_path, fu.dropbox_account_id 
                        FROM file_uploads fu
                        LEFT JOIN users u ON fu.uploaded_by = u.id
                        WHERE u.premium = 0 
-                       AND (fu.expires_at < CURRENT_TIMESTAMP 
-                            OR fu.created_at < DATE_SUB(NOW(), INTERVAL 180 DAY))
-                       AND fu.upload_status = 'completed'");
+                       AND fu.created_at < DATE_SUB(NOW(), INTERVAL 180 DAY)
+                       AND fu.deleted_at IS NULL");
     
-    // Get Dropbox client
-    $dropbox = $db->query("SELECT access_token FROM dropbox_accounts LIMIT 1")->fetch_assoc();
-    $client = new DropboxClient($dropbox['access_token']);
+    // Get Dropbox clients
+    $dropboxAccounts = [];
+    $result = $db->query("SELECT id, access_token FROM dropbox_accounts");
+    while ($row = $result->fetch_assoc()) {
+        $dropboxAccounts[$row['id']] = new DropboxClient($row['access_token']);
+    }
     
+    $deletedCount = 0;
     while ($file = $stmt->fetch_assoc()) {
         try {
-            // Delete from Dropbox
-            $dropboxPath = "/{$file['file_id']}";
-            $client->delete($dropboxPath);
-            
-            // Delete from database
-            $db->query("DELETE FROM file_uploads WHERE file_id = '{$file['file_id']}'");
-            
-            // Delete any cache files
-            $cachePath = __DIR__ . '/../cache/' . $file['file_id'];
-            if (file_exists($cachePath)) {
-                unlink($cachePath);
+            // Delete from Dropbox if synced
+            if ($file['dropbox_account_id'] && isset($dropboxAccounts[$file['dropbox_account_id']]) && $file['dropbox_path']) {
+                try {
+                    $dropboxAccounts[$file['dropbox_account_id']]->delete($file['dropbox_path']);
+                } catch (Exception $e) {
+                    echo "Warning: Could not delete from Dropbox: {$e->getMessage()}\n";
+                }
             }
             
-            echo "Deleted expired file: {$file['file_name']}\n";
+            // Delete local file
+            $localPath = __DIR__ . '/../uploads/' . $file['unique_id'];
+            if (is_dir($localPath)) {
+                $files = glob($localPath . '/*');
+                foreach ($files as $f) {
+                    if (is_file($f)) unlink($f);
+                }
+                rmdir($localPath);
+            }
+            
+            // Soft delete in database
+            $deleteStmt = $db->prepare("UPDATE file_uploads SET deleted_at = NOW() WHERE id = ?");
+            $deleteStmt->bind_param("i", $file['id']);
+            $deleteStmt->execute();
+            
+            $deletedCount++;
+            echo "Deleted expired file: {$file['original_name']}\n";
         } catch (Exception $e) {
-            echo "Error deleting file {$file['file_name']}: {$e->getMessage()}\n";
+            echo "Error deleting file {$file['original_name']}: {$e->getMessage()}\n";
             continue;
         }
     }

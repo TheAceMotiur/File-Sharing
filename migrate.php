@@ -1,16 +1,21 @@
 <?php
-require_once __DIR__ . '/config.php';
+/**
+ * Database Migration Runner
+ * Run this to execute all pending migrations
+ */
 
-// Start by getting the database connection
-$db = getDBConnection();
-
-// Include the Migration class
+require_once __DIR__ . '/config/bootstrap.php';
 require_once __DIR__ . '/database/Migration.php';
 
 try {
-    echo "Starting migrations...\n";
+    $db = getDBConnection();
     $migration = new App\Migration($db);
+    
+    echo "Running migrations...\n";
     $migration->migrate();
+    echo "All migrations completed successfully!\n";
+    
 } catch (Exception $e) {
-    die("Error: " . $e->getMessage() . "\n");
+    echo "Migration failed: " . $e->getMessage() . "\n";
+    exit(1);
 }

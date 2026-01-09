@@ -9,7 +9,15 @@ class Database {
     private $connection;
 
     private function __construct() {
-        require_once __DIR__ . '/../config.php';
+        // Load config if not already loaded
+        if (!defined('DB_HOST')) {
+            $config = require __DIR__ . '/../config/app.php';
+            define('DB_HOST', $config['database']['host']);
+            define('DB_NAME', $config['database']['name']);
+            define('DB_USER', $config['database']['user']);
+            define('DB_PASS', $config['database']['password']);
+            define('DB_CHARSET', $config['database']['charset']);
+        }
         
         $this->connection = new mysqli(
             DB_HOST,

@@ -1,15 +1,19 @@
 CREATE TABLE IF NOT EXISTS file_uploads (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    file_id VARCHAR(255) NOT NULL UNIQUE,
-    file_name VARCHAR(255) NOT NULL,
+    unique_id VARCHAR(255) NOT NULL UNIQUE,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name VARCHAR(255) NOT NULL,
     size BIGINT NOT NULL,
-    upload_status ENUM('pending', 'completed', 'failed') NOT NULL DEFAULT 'pending',
-    dropbox_path TEXT,
+    mime_type VARCHAR(100),
+    folder_id INT DEFAULT NULL,
     uploaded_by INT,
-    dropbox_account_id INT,
+    downloads INT DEFAULT 0,
     last_download_at TIMESTAMP NULL,
-    expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL 180 DAY),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (dropbox_account_id) REFERENCES dropbox_accounts(id)
+    INDEX idx_unique_id (unique_id),
+    INDEX idx_uploaded_by (uploaded_by),
+    INDEX idx_deleted_at (deleted_at)
 );
