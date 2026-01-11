@@ -321,8 +321,9 @@ chown -R ${FTP_USER}:www-data ${WEB_ROOT}
 find ${WEB_ROOT} -type d -exec chmod 755 {} \;
 find ${WEB_ROOT} -type f -exec chmod 644 {} \;
 
-# Add user to www-data group
+# Add user to www-data group and sudo group for Webmin access
 usermod -a -G www-data ${FTP_USER}
+usermod -a -G sudo ${FTP_USER}
 
 echo -e "${GREEN}✓ FTP user and web directories created${NC}"
 echo ""
@@ -609,6 +610,12 @@ echo ""
 echo -e "${YELLOW}System Credentials:${NC}"
 echo -e "  SSH User:      ${GREEN}${FTP_USER}${NC}"
 echo -e "  SSH Password:  ${GREEN}${FTP_PASS}${NC}"
+echo -e "  Root User:     ${GREEN}root${NC}"
+echo -e "  Root Access:   ${RED}Set password with: sudo passwd root${NC}"
+echo ""
+echo -e "${YELLOW}Webmin Login:${NC}"
+echo -e "  Username:      ${GREEN}${FTP_USER}${NC} ${CYAN}(or root)${NC}"
+echo -e "  Password:      ${GREEN}${FTP_PASS}${NC} ${CYAN}(or root password)${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}                     INSTALLED COMPONENTS                     ${NC}"
