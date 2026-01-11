@@ -9,12 +9,11 @@ jobs:
       uses: actions/checkout@v4
 
     - name: 📂 Sync files
-      uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.6
       with:
         server: 158.69.60.81
         username: TheAceMotiur_onenetly
         password: ${{ secrets.FTP_PASSWORD }}
+        protocol: ftps
         port: 22
-        sftp_only: true
-        local_path: './'
-        remote_path: '/home/TheAceMotiur/web/onenetly.com/public_html/'
+        server-dir: /home/TheAceMotiur/web/onenetly.com/public_html/
