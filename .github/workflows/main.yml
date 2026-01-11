@@ -17,4 +17,4 @@ jobs:
         port: 22
         sftp_only: true
         local_path: './'
-        remote_path: '/home/TheAceMotiur/web/onenetly.com/public_html/'
+        remote_path: './public_html/'
