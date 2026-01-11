@@ -17,3 +17,10 @@ jobs:
         protocol: ftps
         port: 21
         server-dir: /public_html/
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          **/.env.example
+          **/cache/**
+          **/uploads/**
