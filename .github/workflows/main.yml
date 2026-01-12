@@ -9,10 +9,12 @@ jobs:
       uses: actions/checkout@v4
 
     - name: 📂 Sync files
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.6
       with:
         server: 158.69.60.81
         username: TheAceMotiur_onenetly
         password: ${{ secrets.FTP_PASSWORD }}
-        protocol: ftp
+        protocol: ftps
         port: 21
+        local-dir: ./public_html/
+        server-dir: /home/TheAceMotiur/web/onenetly.com/public_html/
