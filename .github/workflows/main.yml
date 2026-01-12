@@ -16,4 +16,4 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftp
         port: 21
-        log-level: verbose
+        server-dir: public_html/
