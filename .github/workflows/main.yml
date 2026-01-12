@@ -16,6 +16,5 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftps
         port: 21
-        local-dir: ./public_html/
         server-dir: /home/TheAceMotiur/web/onenetly.com/public_html/
-        
+
