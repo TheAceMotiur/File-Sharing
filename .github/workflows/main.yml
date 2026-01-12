@@ -16,4 +16,4 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftp
         port: 21
-        server-dir: web/onenetly.com/public_html/
+        log-level: verbose
