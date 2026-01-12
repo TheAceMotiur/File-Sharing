@@ -17,4 +17,6 @@ jobs:
         protocol: ftps
         port: 21
         server-dir: /home/TheAceMotiur_onenetly/public_html/
+        exclude: |
+          .env
 
