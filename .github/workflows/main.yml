@@ -14,6 +14,6 @@ jobs:
         server: 158.69.60.81
         username: TheAceMotiur_onenetly
         password: ${{ secrets.FTP_PASSWORD }}
-        protocol: ftps
+        protocol: ftp
         port: 21
-
+        server-dir: /public_html/
