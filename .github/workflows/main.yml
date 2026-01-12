@@ -12,15 +12,8 @@ jobs:
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: 158.69.60.81
-        username: onenetly
+        username: TheAceMotiur_onenetly
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftps
         port: 21
-        server-dir: /public_html/
-        exclude: |
-          **/.git*
-          **/.git*/**
-          **/node_modules/**
-          **/.env.example
-          **/cache/**
-          **/uploads/**
+        server-dir: /home/TheAceMotiur/web/onenetly.com
