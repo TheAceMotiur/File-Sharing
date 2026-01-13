@@ -1,5 +1,14 @@
-<?php
+// Autoload dependencies
+require_once dirname(__DIR__) . '/vendor/autoload.php';
 
+// Load .env variables
+if (file_exists(dirname(__DIR__) . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__));
+    $dotenv->load();
+}
+
+// Load configuration
+$config = require_once __DIR__ . '/app.php';
 /**
  * Bootstrap file
  * Initializes the application

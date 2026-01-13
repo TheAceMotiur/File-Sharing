@@ -13,6 +13,7 @@
         "phpmailer/phpmailer": "^6.9",
         "psr/http-message": "^1.0",
         "guzzlehttp/psr7": "^2.0",
-        "spatie/dropbox-api": "^1.22"
+        "spatie/dropbox-api": "^1.22",
+        "vlucas/phpdotenv": "^5.6"
     }
 }
