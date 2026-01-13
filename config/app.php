@@ -3,17 +3,17 @@
 return [
     // Database Configuration
     'database' => [
-        'host' => getenv('DB_HOST'),
-        'name' => getenv('DB_NAME'),
-        'user' => getenv('DB_USER'),
-        'password' => getenv('DB_PASS'),
+        'host' => $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost',
+        'name' => $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: '',
+        'user' => $_ENV['DB_USER'] ?? getenv('DB_USER') ?: '',
+        'password' => $_ENV['DB_PASS'] ?? getenv('DB_PASS') ?: '',
         'charset' => 'utf8mb4',
     ], 
     
     // Site Configuration
     'site' => [
         'name' => 'OneNetly',
-        'url' => getenv('SITE_URL'),
+        'url' => $_ENV['SITE_URL'] ?? getenv('SITE_URL') ?: 'http://localhost',
         'base_path' => dirname(__DIR__),
     ],
     
