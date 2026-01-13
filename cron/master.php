@@ -7,9 +7,12 @@
  * Setup: * * * * * cd /path/to/onenetly && php cron/master.php >> logs/cron.log 2>&1
  */
 
-require_once __DIR__ . '/../database/Database.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
-$db = App\Database::getInstance()->getConnection();
+use App\Database;
+
+$db = Database::getInstance()->getConnection();
 
 // Get current time
 $now = new DateTime();
