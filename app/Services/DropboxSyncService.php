@@ -274,24 +274,30 @@ class DropboxSyncService
                 return false;
             }
             
-            // Check if token is expired
+            // Proactively refresh token if expired or expiring soon (within 1 hour)
+            $needsRefresh = false;
             if (isset($account['token_expires_at'])) {
                 $expiresAt = strtotime($account['token_expires_at']);
-                if ($expiresAt < time()) {
-                    error_log("Dropbox download failed for file {$file['id']}: Access token expired at " . $account['token_expires_at']);
-                    error_log("Attempting to refresh token for account {$account['id']}...");
-                    
-                    // Try to refresh the token
-                    if (!$this->refreshAccessToken($account['id'])) {
-                        error_log("Token refresh failed for account {$account['id']}");
-                        return false;
-                    }
-                    
+                $oneHourFromNow = time() + 3600;
+                
+                if ($expiresAt < $oneHourFromNow) {
+                    $needsRefresh = true;
+                    error_log("Token for account {$account['id']} expires soon or has expired. Refreshing in background...");
+                }
+            }
+            
+            // Refresh token in background if needed
+            if ($needsRefresh) {
+                // Try to refresh the token
+                if ($this->refreshAccessToken($account['id'])) {
                     // Get updated account with new token
                     $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
                     $stmt->bind_param("i", $file['dropbox_account_id']);
                     $stmt->execute();
                     $account = $stmt->get_result()->fetch_assoc();
+                    error_log("Token refreshed successfully for account {$account['id']}");
+                } else {
+                    error_log("Background token refresh failed for account {$account['id']}, attempting download anyway...");
                 }
             }
             
