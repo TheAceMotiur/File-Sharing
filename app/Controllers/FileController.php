@@ -192,14 +192,18 @@ class FileController extends Controller
     private function downloadFromDropbox($file)
     {
         try {
+            error_log("Starting Dropbox download for file {$file['id']} (unique_id: {$file['unique_id']})");
+            
             $fileContent = $this->dropboxService->downloadFromDropbox($file);
             
             if (!$fileContent) {
-                throw new \Exception('Failed to download from Dropbox');
+                error_log("Dropbox download returned empty for file {$file['id']}");
+                throw new \Exception('Download returned empty content. The file may have been removed or the access token expired.');
             }
             
             // Store in cache for future requests
             $cacheFile = $this->storeInCache($file, $fileContent);
+            error_log("Cached file {$file['id']} for future downloads");
             
             // Set headers for download
             header('Content-Type: application/octet-stream');
@@ -213,10 +217,33 @@ class FileController extends Controller
             exit;
             
         } catch (\Exception $e) {
-            // Log error
+            // Log detailed error
             error_log("Dropbox download failed for file {$file['id']}: " . $e->getMessage());
+            error_log("File details - ID: {$file['id']}, Unique ID: {$file['unique_id']}, Dropbox Path: {$file['dropbox_path']}, Account: {$file['dropbox_account_id']}");
+            
+            // Show user-friendly error
             http_response_code(500);
-            die('Failed to download file from Dropbox. Please try again later.');
+            echo '<!DOCTYPE html>';
+            echo '<html><head><title>Download Failed</title>';
+            echo '<style>body{font-family:Arial,sans-serif;max-width:600px;margin:50px auto;padding:20px;}';
+            echo 'h1{color:#dc3545;}ul{line-height:1.8;}</style></head><body>';
+            echo '<h1>⚠️ Download Failed</h1>';
+            echo '<p>We were unable to download the file from Dropbox. This could be due to:</p>';
+            echo '<ul>';
+            echo '<li><strong>Expired or missing access token</strong> - The administrator needs to reconnect the Dropbox account</li>';
+            echo '<li><strong>File removed from Dropbox</strong> - The file may have been deleted</li>';
+            echo '<li><strong>Dropbox API connectivity issues</strong> - Temporary service disruption</li>';
+            echo '<li><strong>Invalid Dropbox account configuration</strong> - Please contact the administrator</li>';
+            echo '</ul>';
+            echo '<p><strong>What to do:</strong></p>';
+            echo '<ol>';
+            echo '<li>Try again in a few minutes</li>';
+            echo '<li>If the problem persists, contact the website administrator</li>';
+            echo '<li>Administrators: Check the Dropbox settings page and ensure all accounts are properly connected</li>';
+            echo '</ol>';
+            echo '<p style="margin-top:30px;"><a href="/" style="color:#007bff;text-decoration:none;">← Return to Home</a></p>';
+            echo '</body></html>';
+            exit;
         }
     }
     

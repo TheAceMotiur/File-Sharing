@@ -35,6 +35,8 @@ class DropboxSyncService
         $stmt = $this->db->prepare("
             SELECT * FROM dropbox_accounts 
             WHERE (used_storage + ?) <= ?
+            AND access_token IS NOT NULL
+            AND access_token != ''
             ORDER BY used_storage ASC
             LIMIT 1
         ");
@@ -73,6 +75,13 @@ class DropboxSyncService
             if (!$account) {
                 $this->updateSyncStatus($fileId, 'failed');
                 error_log("No available Dropbox account for file {$fileId}");
+                return false;
+            }
+            
+            // Validate access token
+            if (empty($account['access_token'])) {
+                $this->updateSyncStatus($fileId, 'failed');
+                error_log("Dropbox sync failed for file {$fileId}: Access token is empty for account {$account['id']}. Admin needs to connect this account via OAuth.");
                 return false;
             }
             
@@ -242,6 +251,12 @@ class DropboxSyncService
     public function downloadFromDropbox(array $file)
     {
         try {
+            // Validate file has Dropbox info
+            if (empty($file['dropbox_account_id']) || empty($file['dropbox_path'])) {
+                error_log("Dropbox download failed for file {$file['id']}: Missing Dropbox account or path");
+                return false;
+            }
+            
             // Get Dropbox account
             $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
             $stmt->bind_param("i", $file['dropbox_account_id']);
@@ -249,15 +264,128 @@ class DropboxSyncService
             $account = $stmt->get_result()->fetch_assoc();
             
             if (!$account) {
+                error_log("Dropbox download failed for file {$file['id']}: Dropbox account {$file['dropbox_account_id']} not found");
                 return false;
             }
             
+            // Check if access token is empty
+            if (empty($account['access_token'])) {
+                error_log("Dropbox download failed for file {$file['id']}: Access token is empty for account {$account['id']}. Admin needs to connect this account via OAuth.");
+                return false;
+            }
+            
+            // Check if token is expired
+            if (isset($account['token_expires_at'])) {
+                $expiresAt = strtotime($account['token_expires_at']);
+                if ($expiresAt < time()) {
+                    error_log("Dropbox download failed for file {$file['id']}: Access token expired at " . $account['token_expires_at']);
+                    error_log("Attempting to refresh token for account {$account['id']}...");
+                    
+                    // Try to refresh the token
+                    if (!$this->refreshAccessToken($account['id'])) {
+                        error_log("Token refresh failed for account {$account['id']}");
+                        return false;
+                    }
+                    
+                    // Get updated account with new token
+                    $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
+                    $stmt->bind_param("i", $file['dropbox_account_id']);
+                    $stmt->execute();
+                    $account = $stmt->get_result()->fetch_assoc();
+                }
+            }
+            
             // Download from Dropbox
+            error_log("Attempting Dropbox download for file {$file['id']} ({$file['original_name']}) from path: {$file['dropbox_path']}");
+            
             $client = new DropboxClient($account['access_token']);
-            return $client->download($file['dropbox_path']);
+            $content = $client->download($file['dropbox_path']);
+            
+            if ($content === false || $content === null) {
+                error_log("Dropbox download returned empty content for file {$file['id']}");
+                return false;
+            }
+            
+            $downloadedSize = strlen($content);
+            error_log("Dropbox download successful for file {$file['id']}: " . number_format($downloadedSize / (1024*1024), 2) . " MB");
+            
+            return $content;
+            
+        } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
+            error_log("Dropbox BadRequest for file {$file['id']}: " . $e->getMessage());
+            return false;
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $response = $e->getResponse();
+            $statusCode = $response ? $response->getStatusCode() : 'unknown';
+            $body = $response ? $response->getBody()->getContents() : 'no response';
+            error_log("Dropbox ClientException for file {$file['id']} (HTTP {$statusCode}): " . $e->getMessage());
+            error_log("Response body: " . $body);
+            return false;
+        } catch (\Exception $e) {
+            error_log("Dropbox download exception for file {$file['id']}: " . get_class($e) . " - " . $e->getMessage());
+            if (method_exists($e, 'getTraceAsString')) {
+                error_log("Stack trace: " . $e->getTraceAsString());
+            }
+            return false;
+        }
+    }
+    
+    /**
+     * Refresh Dropbox access token
+     * 
+     * @param int $accountId
+     * @return bool
+     */
+    private function refreshAccessToken(int $accountId): bool
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
+            $stmt->bind_param("i", $accountId);
+            $stmt->execute();
+            $account = $stmt->get_result()->fetch_assoc();
+            
+            if (!$account || empty($account['refresh_token'])) {
+                error_log("Cannot refresh token for account {$accountId}: No refresh token available");
+                return false;
+            }
+            
+            // Get app credentials from the account itself (not from dropbox_settings)
+            $appKey = $account['app_key'] ?? null;
+            $appSecret = $account['app_secret'] ?? null;
+            
+            if (!$appKey || !$appSecret) {
+                error_log("Cannot refresh token for account {$accountId}: Missing app_key or app_secret");
+                return false;
+            }
+            
+            // Request new access token
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://api.dropbox.com/oauth2/token', [
+                'form_params' => [
+                    'grant_type' => 'refresh_token',
+                    'refresh_token' => $account['refresh_token'],
+                    'client_id' => $appKey,
+                    'client_secret' => $appSecret,
+                ]
+            ]);
+            
+            $data = json_decode($response->getBody(), true);
+            
+            if (isset($data['access_token'])) {
+                // Update access token
+                $expiresAt = date('Y-m-d H:i:s', time() + $data['expires_in']);
+                $stmt = $this->db->prepare("UPDATE dropbox_accounts SET access_token = ?, token_expires_at = ? WHERE id = ?");
+                $stmt->bind_param("ssi", $data['access_token'], $expiresAt, $accountId);
+                $stmt->execute();
+                
+                error_log("Successfully refreshed token for account {$accountId}, expires at {$expiresAt}");
+                return true;
+            }
+            
+            return false;
             
         } catch (\Exception $e) {
-            error_log("Dropbox download failed: " . $e->getMessage());
+            error_log("Token refresh failed for account {$accountId}: " . $e->getMessage());
             return false;
         }
     }
