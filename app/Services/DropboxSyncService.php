@@ -118,8 +118,16 @@ class DropboxSyncService
             // Delete local file immediately after successful sync
             $config = require __DIR__ . '/../../config/app.php';
             if ($config['dropbox']['delete_local_after_sync']) {
-                $deleted = $this->deleteLocalFile($file['unique_id']);
-                error_log("File {$fileId} synced to Dropbox. Local deletion: " . ($deleted ? 'SUCCESS' : 'FAILED'));
+                try {
+                    $deleted = $this->deleteLocalFile($file['unique_id']);
+                    if ($deleted) {
+                        error_log("File {$fileId} synced to Dropbox. Local files deleted successfully.");
+                    } else {
+                        error_log("File {$fileId} synced to Dropbox. WARNING: Local file deletion failed - directory may not exist or may not be empty.");
+                    }
+                } catch (\Exception $e) {
+                    error_log("File {$fileId} synced to Dropbox. ERROR deleting local files: " . $e->getMessage());
+                }
             }
             
             return true;
@@ -155,18 +163,73 @@ class DropboxSyncService
         $dir = UPLOAD_DIR . $uniqueId;
         
         if (!is_dir($dir)) {
+            error_log("Directory does not exist: {$dir}");
             return false;
         }
         
-        // Delete all files in directory
-        $files = glob($dir . '/*');
+        try {
+            // Delete all files in directory (including hidden files)
+            $files = glob($dir . '/{,.}[!.,!..]*', GLOB_MARK|GLOB_BRACE);
+            if ($files === false) {
+                $files = [];
+            }
+            
+            $deletedCount = 0;
+            foreach ($files as $file) {
+                if (is_file($file)) {
+                    if (unlink($file)) {
+                        $deletedCount++;
+                    } else {
+                        error_log("Failed to delete file: {$file}");
+                    }
+                } elseif (is_dir($file)) {
+                    // Recursively delete subdirectories
+                    $this->deleteDirectory($file);
+                }
+            }
+            
+            // Remove directory
+            if (rmdir($dir)) {
+                error_log("Successfully deleted directory: {$dir} (removed {$deletedCount} files)");
+                return true;
+            } else {
+                // Check if directory still has contents
+                $remaining = scandir($dir);
+                $remaining = array_diff($remaining, ['.', '..']);
+                error_log("Failed to remove directory: {$dir}. Remaining items: " . implode(', ', $remaining));
+                return false;
+            }
+        } catch (\Exception $e) {
+            error_log("Exception while deleting directory {$dir}: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Recursively delete a directory
+     * 
+     * @param string $dir
+     * @return bool
+     */
+    private function deleteDirectory(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+        
+        $files = glob($dir . '/{,.}[!.,!..]*', GLOB_MARK|GLOB_BRACE);
+        if ($files === false) {
+            $files = [];
+        }
+        
         foreach ($files as $file) {
-            if (is_file($file)) {
+            if (is_dir($file)) {
+                $this->deleteDirectory($file);
+            } else {
                 unlink($file);
             }
         }
         
-        // Remove directory
         return rmdir($dir);
     }
     
@@ -232,6 +295,7 @@ class DropboxSyncService
                 SELECT id, unique_id, original_name, size
                 FROM file_uploads 
                 WHERE (sync_status = 'failed' OR (sync_status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 48 HOUR)))
+                AND storage_location = 'local'
                 LIMIT 50
             ");
             $stmt->execute();
@@ -242,15 +306,17 @@ class DropboxSyncService
             $totalFreed = 0;
             
             foreach ($files as $file) {
-                $localPath = __DIR__ . '/../../uploads/' . $file['unique_id'];
+                $localPath = UPLOAD_DIR . $file['unique_id'];
                 
                 if (is_dir($localPath)) {
                     // Delete local file
-                    $this->deleteLocalFile($file['unique_id']);
-                    $cleaned++;
-                    $totalFreed += $file['size'];
-                    
-                    echo "Cleaned: {$file['original_name']} (" . number_format($file['size'] / (1024*1024), 2) . " MB)\n";
+                    if ($this->deleteLocalFile($file['unique_id'])) {
+                        $cleaned++;
+                        $totalFreed += $file['size'];
+                        echo "Cleaned: {$file['original_name']} (" . number_format($file['size'] / (1024*1024), 2) . " MB)\n";
+                    } else {
+                        echo "Failed to clean: {$file['original_name']}\n";
+                    }
                 }
             }
             
