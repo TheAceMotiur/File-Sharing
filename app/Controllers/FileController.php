@@ -192,6 +192,7 @@ class FileController extends Controller
     {
         try {
             error_log("Starting Dropbox download for file {$file['id']} (unique_id: {$file['unique_id']})");
+            error_log("File storage_location: {$file['storage_location']}, sync_status: {$file['sync_status']}");
             
             $fileContent = $this->dropboxService->downloadFromDropbox($file);
             
@@ -199,6 +200,8 @@ class FileController extends Controller
                 error_log("Dropbox download returned empty for file {$file['id']}");
                 throw new \Exception('Download returned empty content. The file may have been removed or the access token expired.');
             }
+            
+            error_log("Successfully downloaded " . strlen($fileContent) . " bytes from Dropbox for file {$file['id']}");
             
             // Store in cache for future requests
             $cacheFile = $this->storeInCache($file, $fileContent);
