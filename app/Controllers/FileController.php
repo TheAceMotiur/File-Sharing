@@ -106,11 +106,21 @@ class FileController extends Controller
             return;
         }
         
-        // Check if file is in Dropbox or local
-        if ($file['storage_location'] === 'dropbox' && $file['sync_status'] === 'synced') {
+        // Determine download source: check if file exists locally first
+        $localPath = UPLOAD_DIR . $file['unique_id'] . '/' . $file['stored_name'];
+        $localExists = file_exists($localPath);
+        
+        // Priority: Local file if exists, otherwise Dropbox if synced
+        if ($localExists) {
+            // File still available locally (not synced yet or sync failed)
+            $this->downloadFromLocal($file);
+        } elseif ($file['storage_location'] === 'dropbox' && $file['sync_status'] === 'synced') {
+            // File synced and removed from local, download from Dropbox
             $this->downloadFromDropbox($file);
         } else {
-            $this->downloadFromLocal($file);
+            // File not found anywhere
+            http_response_code(404);
+            die('File not found on server');
         }
     }
     
@@ -203,10 +213,10 @@ class FileController extends Controller
             exit;
             
         } catch (\Exception $e) {
-            // Log error and fallback to local
+            // Log error
             error_log("Dropbox download failed for file {$file['id']}: " . $e->getMessage());
-            error_log("Attempting local fallback...");
-            $this->downloadFromLocal($file);
+            http_response_code(500);
+            die('Failed to download file from Dropbox. Please try again later.');
         }
     }
     
