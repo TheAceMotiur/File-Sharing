@@ -320,9 +320,14 @@ class DropboxSyncService
                 fclose($resource);
             }
             
-            if ($content === false || empty($content)) {
-                error_log("Dropbox download: Failed to read stream content for file {$file['id']}");
+            if ($content === false) {
+                error_log("Dropbox download: stream_get_contents returned false for file {$file['id']}");
                 return false;
+            }
+            
+            if (empty($content)) {
+                error_log("Dropbox download: Empty content received for file {$file['id']}. File might be 0 bytes or download incomplete.");
+                // Don't return false for 0-byte files, let it through
             }
             
             $downloadedSize = strlen($content);

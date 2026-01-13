@@ -245,21 +245,32 @@ class FileController extends Controller
     private function downloadFromDropbox($file)
     {
         try {
-            error_log("Starting Dropbox download for file {$file['id']} (unique_id: {$file['unique_id']})");
-            error_log("File storage_location: {$file['storage_location']}, sync_status: {$file['sync_status']}");
+            error_log("=== Dropbox Download Debug ===");
+            error_log("File ID: {$file['id']} ({$file['original_name']})");
+            error_log("Unique ID: {$file['unique_id']}");
+            error_log("Storage: {$file['storage_location']}, Sync: {$file['sync_status']}");
+            error_log("Dropbox Path: {$file['dropbox_path']}");
+            error_log("Account ID: {$file['dropbox_account_id']}");
             
             $fileContent = $this->dropboxService->downloadFromDropbox($file);
             
-            if (!$fileContent) {
-                error_log("Dropbox download returned empty for file {$file['id']}");
+            if ($fileContent === false) {
+                error_log("Dropbox download returned FALSE for file {$file['id']}");
                 return false;
             }
             
-            error_log("Successfully downloaded " . strlen($fileContent) . " bytes from Dropbox for file {$file['id']}");
+            if ($fileContent === null) {
+                error_log("Dropbox download returned NULL for file {$file['id']}");
+                return false;
+            }
+            
+            $size = strlen($fileContent);
+            error_log("Successfully downloaded {$size} bytes from Dropbox for file {$file['id']}");
             return $fileContent;
             
         } catch (\Exception $e) {
-            error_log("Dropbox download failed for file {$file['id']}: " . $e->getMessage());
+            error_log("Exception during Dropbox download for file {$file['id']}: " . $e->getMessage());
+            error_log("Exception trace: " . $e->getTraceAsString());
             return false;
         }
     }
