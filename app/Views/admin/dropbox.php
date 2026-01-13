@@ -60,7 +60,7 @@
                                     <div><span class="font-medium">Token:</span> <?php echo substr($account['access_token'], 0, 20) . '...'; ?></div>
                                     <?php endif; ?>
                                     <div><span class="font-medium">Added:</span> <?php echo date('M d, Y g:i A', strtotime($account['created_at'])); ?></div>
-                                    <?php
+                                    <?php if (isset($account['used_storage'])): 
                                     $usedGB = $account['used_storage'] / (1024 * 1024 * 1024);
                                     $percentage = ($account['used_storage'] / (2 * 1024 * 1024 * 1024)) * 100;
                                     $progressColor = $percentage > 90 ? 'bg-red-500' : ($percentage > 70 ? 'bg-yellow-500' : 'bg-green-500');
@@ -74,6 +74,7 @@
                                             <div class="<?php echo $progressColor; ?> h-2 rounded-full" style="width: <?php echo min($percentage, 100); ?>%"></div>
                                         </div>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="flex gap-2">
