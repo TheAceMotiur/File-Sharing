@@ -1,3 +1,9 @@
+<?php
+/**
+ * Bootstrap file
+ * Initializes the application
+ */
+
 // Autoload dependencies
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -6,13 +12,6 @@ if (file_exists(dirname(__DIR__) . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__));
     $dotenv->load();
 }
-
-// Load configuration
-$config = require_once __DIR__ . '/app.php';
-/**
- * Bootstrap file
- * Initializes the application
- */
 
 // Load configuration
 $config = require_once __DIR__ . '/app.php';
@@ -66,9 +65,6 @@ define('API_RATE_LIMIT', $config['api']['rate_limit']);
 define('RECAPTCHA_SITE_KEY', $config['recaptcha']['site_key']);
 define('RECAPTCHA_SECRET_KEY', $config['recaptcha']['secret_key']);
 define('RECAPTCHA_ENABLED', $config['recaptcha']['enabled']);
-
-// Autoload dependencies
-require_once BASE_PATH . '/vendor/autoload.php';
 
 // Load database class
 require_once BASE_PATH . '/database/Database.php';
