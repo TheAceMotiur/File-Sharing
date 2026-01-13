@@ -120,7 +120,27 @@ class FileController extends Controller
                 return;
             }
             
-            error_log("Failed to download file {$file['id']} from Dropbox, trying local...");
+            error_log("Failed to download file {$file['id']} from Dropbox, checking local as fallback...");
+            
+            // Dropbox failed, check local as fallback
+            $localPath = UPLOAD_DIR . $file['unique_id'] . '/' . $file['stored_name'];
+            if (file_exists($localPath)) {
+                error_log("Found file {$file['id']} in local storage as fallback, re-syncing to Dropbox...");
+                
+                // Mark as pending to trigger re-sync
+                $db = getDBConnection();
+                $stmt = $db->prepare("UPDATE file_uploads SET sync_status = 'pending', storage_location = 'local' WHERE id = ?");
+                $stmt->bind_param("i", $file['id']);
+                $stmt->execute();
+                
+                // Serve from local and let cron re-sync
+                $fileContent = file_get_contents($localPath);
+                if ($fileContent !== false) {
+                    $this->storeInCache($file, $fileContent);
+                    $this->serveContent($fileContent, $file, 'local-fallback');
+                    return;
+                }
+            }
         }
         
         // Step 3: Try local upload folder
