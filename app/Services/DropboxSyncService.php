@@ -299,10 +299,23 @@ class DropboxSyncService
             error_log("Attempting Dropbox download for file {$file['id']} ({$file['original_name']}) from path: {$file['dropbox_path']}");
             
             $client = new DropboxClient($account['access_token']);
-            $content = $client->download($file['dropbox_path']);
+            $resource = $client->download($file['dropbox_path']);
             
-            if ($content === false || $content === null) {
-                error_log("Dropbox download returned empty content for file {$file['id']}");
+            if ($resource === false || $resource === null) {
+                error_log("Dropbox download returned empty resource for file {$file['id']}");
+                return false;
+            }
+            
+            // Convert resource stream to string content
+            $content = stream_get_contents($resource);
+            
+            // Close the resource
+            if (is_resource($resource)) {
+                fclose($resource);
+            }
+            
+            if ($content === false || empty($content)) {
+                error_log("Dropbox download: Failed to read stream content for file {$file['id']}");
                 return false;
             }
             
@@ -312,7 +325,16 @@ class DropboxSyncService
             return $content;
             
         } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
-            error_log("Dropbox BadRequest for file {$file['id']}: " . $e->getMessage());
+            $errorMsg = $e->getMessage();
+            error_log("Dropbox BadRequest for file {$file['id']}: {$errorMsg}");
+            
+            // If file not found, mark as failed to prevent repeated download attempts
+            if (strpos($errorMsg, 'path/not_found') !== false) {
+                error_log("File {$file['id']} not found in Dropbox (path: {$file['dropbox_path']}). Marking as failed.");
+                $stmt = $this->db->prepare("UPDATE file_uploads SET sync_status = 'failed', storage_location = 'local' WHERE id = ?");
+                $stmt->bind_param("i", $file['id']);
+                $stmt->execute();
+            }
             return false;
         } catch (\GuzzleHttp\Exception\ClientException $e) {
             $response = $e->getResponse();
@@ -320,6 +342,12 @@ class DropboxSyncService
             $body = $response ? $response->getBody()->getContents() : 'no response';
             error_log("Dropbox ClientException for file {$file['id']} (HTTP {$statusCode}): " . $e->getMessage());
             error_log("Response body: " . $body);
+            
+            // If 401 (unauthorized), try to refresh token
+            if ($statusCode == 401 && !empty($file['dropbox_account_id'])) {
+                error_log("Attempting to refresh token for account {$file['dropbox_account_id']}");
+                $this->refreshAccessToken($file['dropbox_account_id']);
+            }
             return false;
         } catch (\Exception $e) {
             error_log("Dropbox download exception for file {$file['id']}: " . get_class($e) . " - " . $e->getMessage());

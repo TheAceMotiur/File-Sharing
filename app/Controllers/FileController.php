@@ -118,9 +118,8 @@ class FileController extends Controller
             // File synced and removed from local, download from Dropbox
             $this->downloadFromDropbox($file);
         } else {
-            // File not found anywhere
-            http_response_code(404);
-            die('File not found on server');
+            // File not found anywhere - show detailed error
+            $this->showFileNotFoundError($file);
         }
     }
     
@@ -245,6 +244,38 @@ class FileController extends Controller
             echo '</body></html>';
             exit;
         }
+    }
+    
+    /**
+     * Show detailed error when file is not found
+     */
+    private function showFileNotFoundError($file)
+    {
+        http_response_code(404);
+        echo '<!DOCTYPE html>';
+        echo '<html><head><title>File Not Found</title>';
+        echo '<style>body{font-family:Arial,sans-serif;max-width:600px;margin:50px auto;padding:20px;}' ;
+        echo 'h1{color:#dc3545;}ul{line-height:1.8;}.code{background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:monospace;}</style></head><body>';
+        echo '<h1>⚠️ File Not Found</h1>';
+        echo '<p>The requested file could not be found in any storage location.</p>';
+        echo '<p><strong>File:</strong> ' . htmlspecialchars($file['original_name']) . '</p>';
+        echo '<p><strong>Status:</strong> Storage: <span class="code">' . htmlspecialchars($file['storage_location']) . '</span>, ';
+        echo 'Sync: <span class="code">' . htmlspecialchars($file['sync_status']) . '</span></p>';
+        echo '<p>This typically means:</p>';
+        echo '<ul>';
+        echo '<li>The file was marked as synced but is missing from Dropbox</li>';
+        echo '<li>The file was deleted from local storage before sync completed</li>';
+        echo '<li>There was a data integrity issue during file management</li>';
+        echo '</ul>';
+        echo '<p><strong>Administrator Action Required:</strong></p>';
+        echo '<ol>';
+        echo '<li>Run the repair script: <span class="code">php cron/fix_broken_dropbox_files.php</span></li>';
+        echo '<li>Check the file status: <span class="code">php cron/verify_file_status.php ' . $file['id'] . '</span></li>';
+        echo '<li>If the file cannot be recovered, consider removing this database entry</li>';
+        echo '</ol>';
+        echo '<p style="margin-top:30px;"><a href="/" style="color:#007bff;text-decoration:none;">← Return to Home</a></p>';
+        echo '</body></html>';
+        exit;
     }
     
     /**
