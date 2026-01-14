@@ -547,85 +547,102 @@ class DropboxSyncService
             }
             
             // Get temporary link from Dropbox
-            error_log("Requesting temporary link for file {$file['id']} from path: {$file['dropbox_path']}");;
+            error_log("Requesting download link for file {$file['id']} from path: {$file['dropbox_path']}");;
             
-            // Use direct Guzzle client for better error handling
+            // Try to get or create a shared link (works with standard Dropbox permissions)
             try {
                 $guzzleClient = new \GuzzleHttp\Client();
-                $response = $guzzleClient->post('https://api.dropboxapi.com/2/files/get_temporary_link', [
+                
+                // First, try to get existing shared link
+                $response = $guzzleClient->post('https://api.dropboxapi.com/2/sharing/list_shared_links', [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $account['access_token'],
                         'Content-Type' => 'application/json',
                     ],
                     'json' => [
-                        'path' => $file['dropbox_path']
+                        'path' => $file['dropbox_path'],
+                        'direct_only' => true
                     ],
-                    'http_errors' => true
+                    'http_errors' => false
                 ]);
                 
+                $data = json_decode($response->getBody()->getContents(), true);
+                
+                // If we have an existing link, use it
+                if (isset($data['links']) && count($data['links']) > 0) {
+                    $sharedUrl = $data['links'][0]['url'];
+                    // Convert to direct download link by changing dl=0 to dl=1
+                    $downloadLink = str_replace('dl=0', 'dl=1', $sharedUrl);
+                    error_log("Using existing shared link for file {$file['id']}");
+                    return $downloadLink;
+                }
+                
+                // No existing link, create a new one
+                $response = $guzzleClient->post('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $account['access_token'],
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'path' => $file['dropbox_path'],
+                        'settings' => [
+                            'requested_visibility' => 'public'
+                        ]
+                    ],
+                    'http_errors' => false
+                ]);
+                
+                $statusCode = $response->getStatusCode();
                 $body = $response->getBody()->getContents();
                 $data = json_decode($body, true);
                 
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    error_log("JSON decode error for file {$file['id']}: " . json_last_error_msg());
-                    error_log("Raw response: " . $body);
-                    $this->lastError = 'Invalid JSON response from Dropbox';
-                    return false;
+                if ($statusCode >= 200 && $statusCode < 300 && isset($data['url'])) {
+                    $sharedUrl = $data['url'];
+                    // Convert to direct download link
+                    $downloadLink = str_replace('dl=0', 'dl=1', $sharedUrl);
+                    error_log("Created new shared link for file {$file['id']}");
+                    return $downloadLink;
                 }
                 
-                error_log("Dropbox API response type for file {$file['id']}: " . gettype($data));
-                
-                if (isset($data['link'])) {
-                    error_log("Successfully got temporary link for file {$file['id']}");
-                    return $data['link'];
-                } else if (isset($data['metadata']) && isset($data['metadata']['link'])) {
-                    // Some API versions return nested structure
-                    error_log("Got temporary link from metadata for file {$file['id']}");
-                    return $data['metadata']['link'];
-                } else if (is_string($data) && filter_var($data, FILTER_VALIDATE_URL)) {
-                    // Response might be a direct URL string
-                    error_log("Got direct URL string for file {$file['id']}");
-                    return $data;
-                } else {
-                    error_log("Unexpected response structure for file {$file['id']}: " . json_encode($data));
-                    $this->lastError = 'Dropbox returned unexpected response format - Check error logs';
-                    return false;
+                // Check if link already exists error
+                if (isset($data['error']['.tag']) && $data['error']['.tag'] === 'shared_link_already_exists') {
+                    if (isset($data['error']['shared_link_already_exists']['metadata']['url'])) {
+                        $sharedUrl = $data['error']['shared_link_already_exists']['metadata']['url'];
+                        $downloadLink = str_replace('dl=0', 'dl=1', $sharedUrl);
+                        error_log("Retrieved existing shared link from error for file {$file['id']}");
+                        return $downloadLink;
+                    }
                 }
-            } catch (\GuzzleHttp\Exception\ClientException $apiEx) {
-                $response = $apiEx->getResponse();
-                $statusCode = $response ? $response->getStatusCode() : 'unknown';
-                $body = $response ? $response->getBody()->getContents() : '';
                 
-                error_log("Dropbox API error for file {$file['id']} (HTTP {$statusCode}): " . $apiEx->getMessage());
-                error_log("Response body: " . $body);
+                // If we got here, something went wrong
+                error_log("Failed to get/create shared link for file {$file['id']}: HTTP {$statusCode}");
+                error_log("Response: " . $body);
                 
                 $errorDetail = '';
-                if ($body) {
-                    $decoded = json_decode($body, true);
-                    if ($decoded && isset($decoded['error_summary'])) {
-                        $errorDetail = $decoded['error_summary'];
-                    } else if ($decoded && isset($decoded['error']['.tag'])) {
-                        $errorDetail = $decoded['error']['.tag'];
-                    }
+                if (isset($data['error_summary'])) {
+                    $errorDetail = $data['error_summary'];
+                } else if (isset($data['error']['.tag'])) {
+                    $errorDetail = $data['error']['.tag'];
                 }
                 
                 if ($statusCode == 401) {
                     $this->lastError = 'Access token expired - Run: php cron/refresh_dropbox_tokens.php';
-                } else if ($statusCode == 409 || strpos($errorDetail, 'path/not_found') !== false) {
+                } else if ($statusCode == 409 || strpos($errorDetail, 'path/not_found') !== false || strpos($errorDetail, 'not_found') !== false) {
                     $this->lastError = 'File not found in Dropbox (path: ' . htmlspecialchars($file['dropbox_path']) . ')';
                 } else if ($errorDetail) {
                     $this->lastError = 'Dropbox API error: ' . htmlspecialchars($errorDetail);
                 } else {
-                    $this->lastError = "Dropbox API error (HTTP {$statusCode}): " . htmlspecialchars($apiEx->getMessage());
+                    $this->lastError = "Dropbox API error (HTTP {$statusCode})";
                 }
                 return false;
+                
             } catch (\Exception $ex) {
-                error_log("Exception getting temporary link for file {$file['id']}: " . $ex->getMessage());
+                error_log("Exception getting download link for file {$file['id']}: " . $ex->getMessage());
                 $this->lastError = 'Failed to connect to Dropbox API: ' . htmlspecialchars($ex->getMessage());
                 return false;
             }
             
-            error_log("Could not get temporary link for file {$file['id']}");
+            error_log("Could not get download link for file {$file['id']}");
             $this->lastError = 'Dropbox did not return a download link';
             return false;
             
