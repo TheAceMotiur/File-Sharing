@@ -120,6 +120,9 @@ class FileController extends Controller
                 return;
             }
             
+            // Capture the error from Dropbox service
+            $dropboxError = $this->dropboxService->getLastError();
+            
             error_log("Failed to download file {$file['id']} from Dropbox, checking local as fallback...");
             
             // Dropbox failed, check local as fallback
@@ -158,7 +161,8 @@ class FileController extends Controller
         
         // File not found anywhere
         error_log("File {$file['id']} not found in cache, Dropbox, or local storage");
-        $this->showFileNotFoundError($file);
+        $dropboxError = $this->dropboxService->getLastError();
+        $this->showFileNotFoundError($file, $dropboxError);
     }
     
     /**
@@ -278,30 +282,69 @@ class FileController extends Controller
     /**
      * Show detailed error when file is not found
      */
-    private function showFileNotFoundError($file)
+    private function showFileNotFoundError($file, $dropboxError = null)
     {
         http_response_code(404);
         echo '<!DOCTYPE html>';
-        echo '<html><head><title>File Not Found</title>';
-        echo '<style>body{font-family:Arial,sans-serif;max-width:600px;margin:50px auto;padding:20px;}' ;
-        echo 'h1{color:#dc3545;}ul{line-height:1.8;}.code{background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:monospace;}</style></head><body>';
-        echo '<h1>⚠️ File Not Found</h1>';
-        echo '<p>The requested file could not be found in any storage location.</p>';
+        echo '<html><head><title>File Download Error</title>';
+        echo '<style>body{font-family:Arial,sans-serif;max-width:700px;margin:50px auto;padding:20px;}' ;
+        echo 'h1{color:#dc3545;}ul{line-height:1.8;}.code{background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:monospace;}';
+        echo '.error-box{background:#fff3cd;border-left:4px solid #ffc107;padding:15px;margin:20px 0;border-radius:4px;}';
+        echo '.error-title{font-weight:bold;color:#856404;margin-bottom:8px;}';
+        echo '.error-message{color:#856404;}</style></head><body>';
+        echo '<h1>⚠️ File Download Error</h1>';
+        echo '<p>The requested file could not be downloaded.</p>';
         echo '<p><strong>File:</strong> ' . htmlspecialchars($file['original_name']) . '</p>';
         echo '<p><strong>Status:</strong> Storage: <span class="code">' . htmlspecialchars($file['storage_location']) . '</span>, ';
         echo 'Sync: <span class="code">' . htmlspecialchars($file['sync_status']) . '</span></p>';
-        echo '<p>This typically means:</p>';
-        echo '<ul>';
-        echo '<li>The file was marked as synced but is missing from Dropbox</li>';
-        echo '<li>The file was deleted from local storage before sync completed</li>';
-        echo '<li>There was a data integrity issue during file management</li>';
-        echo '</ul>';
-        echo '<p><strong>Administrator Action Required:</strong></p>';
-        echo '<ol>';
-        echo '<li>Run the repair script: <span class="code">php cron/fix_broken_dropbox_files.php</span></li>';
-        echo '<li>Check the file status: <span class="code">php cron/verify_file_status.php ' . $file['id'] . '</span></li>';
-        echo '<li>If the file cannot be recovered, consider removing this database entry</li>';
-        echo '</ol>';
+        
+        // Show specific Dropbox error if available
+        if ($dropboxError) {
+            echo '<div class="error-box">';
+            echo '<div class="error-title">🔴 Specific Error:</div>';
+            echo '<div class="error-message">' . $dropboxError . '</div>';
+            echo '</div>';
+            
+            // Show helpful instructions based on error type
+            if (strpos($dropboxError, 'token') !== false || strpos($dropboxError, 'Access token') !== false) {
+                echo '<p><strong>This is a Dropbox authentication issue.</strong> The access token may be expired or invalid.</p>';
+                echo '<p><strong>Administrator Actions:</strong></p>';
+                echo '<ol>';
+                echo '<li>Run the token refresh script: <span class="code">php cron/refresh_dropbox_tokens.php</span></li>';
+                echo '<li>If refresh fails, re-authenticate the Dropbox account in Admin → Dropbox Settings</li>';
+                echo '<li>Try downloading the file again after token refresh</li>';
+                echo '</ol>';
+            } else if (strpos($dropboxError, 'not found') !== false || strpos($dropboxError, 'path') !== false) {
+                echo '<p><strong>This is a file location issue.</strong> The file may have been moved or deleted from Dropbox.</p>';
+                echo '<p><strong>Administrator Actions:</strong></p>';
+                echo '<ol>';
+                echo '<li>Run the repair script: <span class="code">php cron/fix_broken_dropbox_files.php</span></li>';
+                echo '<li>Check file status: <span class="code">php cron/verify_file_status.php ' . $file['id'] . '</span></li>';
+                echo '<li>Consider re-uploading the file if original is available</li>';
+                echo '</ol>';
+            } else {
+                echo '<p><strong>Administrator Actions:</strong></p>';
+                echo '<ol>';
+                echo '<li>Check error logs for more details</li>';
+                echo '<li>Verify Dropbox account connection in Admin panel</li>';
+                echo '<li>Run diagnostic: <span class="code">php cron/verify_file_status.php ' . $file['id'] . '</span></li>';
+                echo '</ol>';
+            }
+        } else {
+            echo '<p>Possible causes:</p>';
+            echo '<ul>';
+            echo '<li>The file was marked as synced but is missing from Dropbox</li>';
+            echo '<li>The file was deleted from local storage before sync completed</li>';
+            echo '<li>There was a data integrity issue during file management</li>';
+            echo '</ul>';
+            echo '<p><strong>Administrator Actions:</strong></p>';
+            echo '<ol>';
+            echo '<li>Run the repair script: <span class="code">php cron/fix_broken_dropbox_files.php</span></li>';
+            echo '<li>Check the file status: <span class="code">php cron/verify_file_status.php ' . $file['id'] . '</span></li>';
+            echo '<li>If the file cannot be recovered, consider removing this database entry</li>';
+            echo '</ol>';
+        }
+        
         echo '<p style="margin-top:30px;"><a href="/" style="color:#007bff;text-decoration:none;">← Return to Home</a></p>';
         echo '</body></html>';
         exit;

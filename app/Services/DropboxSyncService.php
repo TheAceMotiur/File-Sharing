@@ -12,6 +12,7 @@ class DropboxSyncService
 {
     private $db;
     private $maxAccountSize;
+    private $lastError = null;
     
     public function __construct($db = null)
     {
@@ -254,6 +255,7 @@ class DropboxSyncService
             // Validate file has Dropbox info
             if (empty($file['dropbox_account_id']) || empty($file['dropbox_path'])) {
                 error_log("Dropbox download failed for file {$file['id']}: Missing Dropbox account or path");
+                $this->lastError = 'File is missing Dropbox configuration (account or path)';
                 return false;
             }
             
@@ -265,12 +267,14 @@ class DropboxSyncService
             
             if (!$account) {
                 error_log("Dropbox download failed for file {$file['id']}: Dropbox account {$file['dropbox_account_id']} not found");
+                $this->lastError = 'Dropbox account not found in system';
                 return false;
             }
             
             // Check if access token is empty
             if (empty($account['access_token'])) {
                 error_log("Dropbox download failed for file {$file['id']}: Access token is empty for account {$account['id']}. Admin needs to connect this account via OAuth.");
+                $this->lastError = 'Dropbox account not connected - Access token missing (Admin needs to authenticate via OAuth)';
                 return false;
             }
             
@@ -309,6 +313,7 @@ class DropboxSyncService
             
             if ($resource === false || $resource === null) {
                 error_log("Dropbox download returned empty resource for file {$file['id']}");
+                $this->lastError = 'Dropbox returned empty response - File may not exist on Dropbox';
                 return false;
             }
             
@@ -322,6 +327,7 @@ class DropboxSyncService
             
             if ($content === false) {
                 error_log("Dropbox download: stream_get_contents returned false for file {$file['id']}");
+                $this->lastError = 'Failed to read file content from Dropbox stream';
                 return false;
             }
             
@@ -345,6 +351,9 @@ class DropboxSyncService
                 $stmt = $this->db->prepare("UPDATE file_uploads SET sync_status = 'failed', storage_location = 'local' WHERE id = ?");
                 $stmt->bind_param("i", $file['id']);
                 $stmt->execute();
+                $this->lastError = 'File not found in Dropbox storage (path: ' . htmlspecialchars($file['dropbox_path']) . ')';
+            } else {
+                $this->lastError = 'Dropbox API error: ' . htmlspecialchars($errorMsg);
             }
             return false;
         } catch (\GuzzleHttp\Exception\ClientException $e) {
@@ -357,7 +366,18 @@ class DropboxSyncService
             // If 401 (unauthorized), try to refresh token
             if ($statusCode == 401 && !empty($file['dropbox_account_id'])) {
                 error_log("Attempting to refresh token for account {$file['dropbox_account_id']}");
-                $this->refreshAccessToken($file['dropbox_account_id']);
+                $refreshed = $this->refreshAccessToken($file['dropbox_account_id']);
+                if ($refreshed) {
+                    $this->lastError = 'Access token expired and was successfully refreshed - Please try downloading again';
+                } else {
+                    $this->lastError = 'Access token expired and refresh failed - Admin needs to re-authenticate Dropbox account';
+                }
+            } else if ($statusCode == 409) {
+                $this->lastError = 'Dropbox conflict error (HTTP 409) - File may be in use or locked';
+            } else if ($statusCode == 429) {
+                $this->lastError = 'Dropbox rate limit exceeded (HTTP 429) - Too many requests, please try again later';
+            } else {
+                $this->lastError = "Dropbox authentication error (HTTP {$statusCode}) - " . htmlspecialchars($e->getMessage());
             }
             return false;
         } catch (\Exception $e) {
@@ -365,6 +385,7 @@ class DropboxSyncService
             if (method_exists($e, 'getTraceAsString')) {
                 error_log("Stack trace: " . $e->getTraceAsString());
             }
+            $this->lastError = 'Unexpected error: ' . htmlspecialchars(get_class($e)) . ' - ' . htmlspecialchars($e->getMessage());
             return false;
         }
     }
@@ -427,6 +448,24 @@ class DropboxSyncService
             error_log("Token refresh failed for account {$accountId}: " . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Get the last error message
+     * 
+     * @return string|null
+     */
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+    
+    /**
+     * Clear the last error message
+     */
+    public function clearLastError(): void
+    {
+        $this->lastError = null;
     }
     
     /**
