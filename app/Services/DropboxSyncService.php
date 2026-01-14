@@ -549,42 +549,80 @@ class DropboxSyncService
             // Get temporary link from Dropbox
             error_log("Requesting temporary link for file {$file['id']} from path: {$file['dropbox_path']}");;
             
-            $client = new DropboxClient($account['access_token']);
-            
-            // Use Dropbox API to get temporary link
-            // The method returns the link directly
+            // Use direct Guzzle client for better error handling
             try {
-                $link = $client->getTemporaryLink($file['dropbox_path']);
+                $guzzleClient = new \GuzzleHttp\Client();
+                $response = $guzzleClient->post('https://api.dropboxapi.com/2/files/get_temporary_link', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $account['access_token'],
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'path' => $file['dropbox_path']
+                    ],
+                    'http_errors' => true
+                ]);
                 
-                if (!empty($link)) {
-                    error_log("Successfully got temporary link for file {$file['id']}");;
-                    return $link;
+                $body = $response->getBody()->getContents();
+                $data = json_decode($body, true);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    error_log("JSON decode error for file {$file['id']}: " . json_last_error_msg());
+                    error_log("Raw response: " . $body);
+                    $this->lastError = 'Invalid JSON response from Dropbox';
+                    return false;
                 }
-            } catch (\Exception $linkEx) {
-                // Try alternate method using rpcEndpointRequest
-                error_log("getTemporaryLink failed, trying alternate method: " . $linkEx->getMessage());
                 
-                try {
-                    $guzzleClient = new \GuzzleHttp\Client();
-                    $response = $guzzleClient->post('https://api.dropboxapi.com/2/files/get_temporary_link', [
-                        'headers' => [
-                            'Authorization' => 'Bearer ' . $account['access_token'],
-                            'Content-Type' => 'application/json',
-                        ],
-                        'json' => [
-                            'path' => $file['dropbox_path']
-                        ]
-                    ]);
-                    
-                    $data = json_decode($response->getBody(), true);
-                    
-                    if (isset($data['link'])) {
-                        error_log("Successfully got temporary link for file {$file['id']} via direct API");
-                        return $data['link'];
+                error_log("Dropbox API response type for file {$file['id']}: " . gettype($data));
+                
+                if (isset($data['link'])) {
+                    error_log("Successfully got temporary link for file {$file['id']}");
+                    return $data['link'];
+                } else if (isset($data['metadata']) && isset($data['metadata']['link'])) {
+                    // Some API versions return nested structure
+                    error_log("Got temporary link from metadata for file {$file['id']}");
+                    return $data['metadata']['link'];
+                } else if (is_string($data) && filter_var($data, FILTER_VALIDATE_URL)) {
+                    // Response might be a direct URL string
+                    error_log("Got direct URL string for file {$file['id']}");
+                    return $data;
+                } else {
+                    error_log("Unexpected response structure for file {$file['id']}: " . json_encode($data));
+                    $this->lastError = 'Dropbox returned unexpected response format - Check error logs';
+                    return false;
+                }
+            } catch (\GuzzleHttp\Exception\ClientException $apiEx) {
+                $response = $apiEx->getResponse();
+                $statusCode = $response ? $response->getStatusCode() : 'unknown';
+                $body = $response ? $response->getBody()->getContents() : '';
+                
+                error_log("Dropbox API error for file {$file['id']} (HTTP {$statusCode}): " . $apiEx->getMessage());
+                error_log("Response body: " . $body);
+                
+                $errorDetail = '';
+                if ($body) {
+                    $decoded = json_decode($body, true);
+                    if ($decoded && isset($decoded['error_summary'])) {
+                        $errorDetail = $decoded['error_summary'];
+                    } else if ($decoded && isset($decoded['error']['.tag'])) {
+                        $errorDetail = $decoded['error']['.tag'];
                     }
-                } catch (\Exception $directEx) {
-                    error_log("Direct API call also failed: " . $directEx->getMessage());
                 }
+                
+                if ($statusCode == 401) {
+                    $this->lastError = 'Access token expired - Run: php cron/refresh_dropbox_tokens.php';
+                } else if ($statusCode == 409 || strpos($errorDetail, 'path/not_found') !== false) {
+                    $this->lastError = 'File not found in Dropbox (path: ' . htmlspecialchars($file['dropbox_path']) . ')';
+                } else if ($errorDetail) {
+                    $this->lastError = 'Dropbox API error: ' . htmlspecialchars($errorDetail);
+                } else {
+                    $this->lastError = "Dropbox API error (HTTP {$statusCode}): " . htmlspecialchars($apiEx->getMessage());
+                }
+                return false;
+            } catch (\Exception $ex) {
+                error_log("Exception getting temporary link for file {$file['id']}: " . $ex->getMessage());
+                $this->lastError = 'Failed to connect to Dropbox API: ' . htmlspecialchars($ex->getMessage());
+                return false;
             }
             
             error_log("Could not get temporary link for file {$file['id']}");
