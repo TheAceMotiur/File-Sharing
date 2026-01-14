@@ -489,6 +489,144 @@ class DropboxSyncService
     }
     
     /**
+     * Get temporary download link from Dropbox
+     * 
+     * @param array $file File info
+     * @return string|false Temporary download URL or false on failure
+     */
+    public function getTemporaryLink(array $file)
+    {
+        try {
+            // Validate file has Dropbox info
+            if (empty($file['dropbox_account_id']) || empty($file['dropbox_path'])) {
+                error_log("Cannot get Dropbox link for file {$file['id']}: Missing Dropbox account or path");
+                $this->lastError = 'File is missing Dropbox configuration (account or path)';
+                return false;
+            }
+            
+            // Get Dropbox account
+            $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
+            $stmt->bind_param("i", $file['dropbox_account_id']);
+            $stmt->execute();
+            $account = $stmt->get_result()->fetch_assoc();
+            
+            if (!$account) {
+                error_log("Cannot get Dropbox link for file {$file['id']}: Dropbox account {$file['dropbox_account_id']} not found");
+                $this->lastError = 'Dropbox account not found in system';
+                return false;
+            }
+            
+            // Check if access token is empty
+            if (empty($account['access_token'])) {
+                error_log("Cannot get Dropbox link for file {$file['id']}: Access token is empty for account {$account['id']}");
+                $this->lastError = 'Dropbox account not connected - Access token missing (Admin needs to authenticate via OAuth)';
+                return false;
+            }
+            
+            // Proactively refresh token if expired or expiring soon
+            $needsRefresh = false;
+            if (isset($account['token_expires_at'])) {
+                $expiresAt = strtotime($account['token_expires_at']);
+                $oneHourFromNow = time() + 3600;
+                
+                if ($expiresAt < $oneHourFromNow) {
+                    $needsRefresh = true;
+                    error_log("Token for account {$account['id']} expires soon. Refreshing...");
+                }
+            }
+            
+            if ($needsRefresh) {
+                if ($this->refreshAccessToken($account['id'])) {
+                    // Get updated token
+                    $stmt = $this->db->prepare("SELECT * FROM dropbox_accounts WHERE id = ?");
+                    $stmt->bind_param("i", $file['dropbox_account_id']);
+                    $stmt->execute();
+                    $account = $stmt->get_result()->fetch_assoc();
+                    error_log("Token refreshed successfully for account {$account['id']}");;
+                }
+            }
+            
+            // Get temporary link from Dropbox
+            error_log("Requesting temporary link for file {$file['id']} from path: {$file['dropbox_path']}");;
+            
+            $client = new DropboxClient($account['access_token']);
+            
+            // Use Dropbox API to get temporary link
+            // The method returns the link directly
+            try {
+                $link = $client->getTemporaryLink($file['dropbox_path']);
+                
+                if (!empty($link)) {
+                    error_log("Successfully got temporary link for file {$file['id']}");;
+                    return $link;
+                }
+            } catch (\Exception $linkEx) {
+                // Try alternate method using rpcEndpointRequest
+                error_log("getTemporaryLink failed, trying alternate method: " . $linkEx->getMessage());
+                
+                try {
+                    $guzzleClient = new \GuzzleHttp\Client();
+                    $response = $guzzleClient->post('https://api.dropboxapi.com/2/files/get_temporary_link', [
+                        'headers' => [
+                            'Authorization' => 'Bearer ' . $account['access_token'],
+                            'Content-Type' => 'application/json',
+                        ],
+                        'json' => [
+                            'path' => $file['dropbox_path']
+                        ]
+                    ]);
+                    
+                    $data = json_decode($response->getBody(), true);
+                    
+                    if (isset($data['link'])) {
+                        error_log("Successfully got temporary link for file {$file['id']} via direct API");
+                        return $data['link'];
+                    }
+                } catch (\Exception $directEx) {
+                    error_log("Direct API call also failed: " . $directEx->getMessage());
+                }
+            }
+            
+            error_log("Could not get temporary link for file {$file['id']}");
+            $this->lastError = 'Dropbox did not return a download link';
+            return false;
+            
+        } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
+            $errorMsg = $e->getMessage();
+            error_log("Dropbox BadRequest getting link for file {$file['id']}: {$errorMsg}");
+            
+            if (strpos($errorMsg, 'path/not_found') !== false) {
+                $this->lastError = 'File not found in Dropbox storage (path: ' . htmlspecialchars($file['dropbox_path']) . ')';
+            } else {
+                $this->lastError = 'Dropbox API error: ' . htmlspecialchars($errorMsg);
+            }
+            return false;
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $response = $e->getResponse();
+            $statusCode = $response ? $response->getStatusCode() : 'unknown';
+            error_log("Dropbox ClientException getting link for file {$file['id']} (HTTP {$statusCode}): " . $e->getMessage());
+            
+            if ($statusCode == 401) {
+                $refreshed = $this->refreshAccessToken($file['dropbox_account_id']);
+                if ($refreshed) {
+                    $this->lastError = 'Access token expired and was refreshed - Please try downloading again';
+                } else {
+                    $this->lastError = 'Access token expired and refresh failed - Admin needs to re-authenticate Dropbox account';
+                }
+            } else if ($statusCode == 429) {
+                $this->lastError = 'Dropbox rate limit exceeded (HTTP 429) - Too many requests, please try again later';
+            } else {
+                $this->lastError = "Dropbox API error (HTTP {$statusCode}): " . htmlspecialchars($e->getMessage());
+            }
+            return false;
+        } catch (\Exception $e) {
+            error_log("Exception getting Dropbox link for file {$file['id']}: " . get_class($e) . " - " . $e->getMessage());
+            $this->lastError = 'Unexpected error: ' . htmlspecialchars(get_class($e)) . ' - ' . htmlspecialchars($e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Get the last error message
      * 
      * @return string|null

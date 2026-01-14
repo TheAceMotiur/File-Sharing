@@ -99,68 +99,33 @@ class FileController extends Controller
         // Increment download count
         $this->fileModel->incrementDownloads($file['id']);
         
-        // Step 1: Check cache first
-        $cachedFile = $this->getCachedFile($file);
-        if ($cachedFile) {
-            error_log("Serving file {$file['id']} from cache");
-            $this->serveFromCache($cachedFile, $file);
-            return;
-        }
-        
-        // Step 2: Try Dropbox if file is synced
+        // Try Dropbox if file is synced
         if ($file['storage_location'] === 'dropbox' && $file['sync_status'] === 'synced') {
-            error_log("File {$file['id']} not in cache, trying Dropbox...");
-            $fileContent = $this->dropboxService->downloadFromDropbox($file);
+            error_log("Getting Dropbox temporary link for file {$file['id']}");
+            $tempLink = $this->dropboxService->getTemporaryLink($file);
             
-            if ($fileContent) {
-                // Download successful, cache it and serve
-                error_log("Downloaded file {$file['id']} from Dropbox, caching and serving...");
-                $this->storeInCache($file, $fileContent);
-                $this->serveContent($fileContent, $file, 'dropbox');
-                return;
+            if ($tempLink) {
+                // Redirect to Dropbox temporary download link
+                error_log("Redirecting to Dropbox temporary link for file {$file['id']}");
+                header('Location: ' . $tempLink);
+                exit;
             }
             
             // Capture the error from Dropbox service
             $dropboxError = $this->dropboxService->getLastError();
-            
-            error_log("Failed to download file {$file['id']} from Dropbox, checking local as fallback...");
-            
-            // Dropbox failed, check local as fallback
-            $localPath = UPLOAD_DIR . $file['unique_id'] . '/' . $file['stored_name'];
-            if (file_exists($localPath)) {
-                error_log("Found file {$file['id']} in local storage as fallback, re-syncing to Dropbox...");
-                
-                // Mark as pending to trigger re-sync
-                $db = getDBConnection();
-                $stmt = $db->prepare("UPDATE file_uploads SET sync_status = 'pending', storage_location = 'local' WHERE id = ?");
-                $stmt->bind_param("i", $file['id']);
-                $stmt->execute();
-                
-                // Serve from local and let cron re-sync
-                $fileContent = file_get_contents($localPath);
-                if ($fileContent !== false) {
-                    $this->storeInCache($file, $fileContent);
-                    $this->serveContent($fileContent, $file, 'local-fallback');
-                    return;
-                }
-            }
+            error_log("Failed to get Dropbox link for file {$file['id']}: " . ($dropboxError ?? 'unknown'));
         }
         
-        // Step 3: Try local upload folder
+        // Fallback: Try local storage
         $localPath = UPLOAD_DIR . $file['unique_id'] . '/' . $file['stored_name'];
         if (file_exists($localPath)) {
-            error_log("Found file {$file['id']} in local storage, caching and serving...");
-            $fileContent = file_get_contents($localPath);
-            
-            if ($fileContent !== false) {
-                $this->storeInCache($file, $fileContent);
-                $this->serveContent($fileContent, $file, 'local');
-                return;
-            }
+            error_log("Serving file {$file['id']} from local storage");
+            $this->downloadFromLocal($file);
+            return;
         }
         
         // File not found anywhere
-        error_log("File {$file['id']} not found in cache, Dropbox, or local storage");
+        error_log("File {$file['id']} not found in Dropbox or local storage");
         $dropboxError = $this->dropboxService->getLastError();
         $this->showFileNotFoundError($file, $dropboxError);
     }
