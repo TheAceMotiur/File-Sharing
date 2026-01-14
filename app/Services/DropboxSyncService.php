@@ -343,7 +343,23 @@ class DropboxSyncService
             
         } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
             $errorMsg = $e->getMessage();
+            $response = method_exists($e, 'getResponse') ? $e->getResponse() : null;
+            $body = '';
+            
+            if ($response) {
+                $body = $response->getBody()->getContents();
+                $decoded = json_decode($body, true);
+                if ($decoded && isset($decoded['error_summary'])) {
+                    $errorMsg .= ' - ' . $decoded['error_summary'];
+                } else if ($decoded && isset($decoded['error'])) {
+                    $errorMsg .= ' - ' . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                }
+            }
+            
             error_log("Dropbox BadRequest for file {$file['id']}: {$errorMsg}");
+            if ($body) {
+                error_log("Response body: " . $body);
+            }
             
             // If file not found, mark as failed to prevent repeated download attempts
             if (strpos($errorMsg, 'path/not_found') !== false) {
@@ -352,6 +368,8 @@ class DropboxSyncService
                 $stmt->bind_param("i", $file['id']);
                 $stmt->execute();
                 $this->lastError = 'File not found in Dropbox storage (path: ' . htmlspecialchars($file['dropbox_path']) . ')';
+            } else if (empty($errorMsg) || $errorMsg === '') {
+                $this->lastError = 'Dropbox API returned an error with no details - Check server logs or try refreshing tokens';
             } else {
                 $this->lastError = 'Dropbox API error: ' . htmlspecialchars($errorMsg);
             }
@@ -360,6 +378,22 @@ class DropboxSyncService
             $response = $e->getResponse();
             $statusCode = $response ? $response->getStatusCode() : 'unknown';
             $body = $response ? $response->getBody()->getContents() : 'no response';
+            $errorDetail = '';
+            
+            // Try to extract error details from response body
+            if ($body && $body !== 'no response') {
+                $decoded = json_decode($body, true);
+                if ($decoded) {
+                    if (isset($decoded['error_summary'])) {
+                        $errorDetail = $decoded['error_summary'];
+                    } else if (isset($decoded['error'])) {
+                        $errorDetail = is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']);
+                    } else if (isset($decoded['error_description'])) {
+                        $errorDetail = $decoded['error_description'];
+                    }
+                }
+            }
+            
             error_log("Dropbox ClientException for file {$file['id']} (HTTP {$statusCode}): " . $e->getMessage());
             error_log("Response body: " . $body);
             
@@ -370,14 +404,18 @@ class DropboxSyncService
                 if ($refreshed) {
                     $this->lastError = 'Access token expired and was successfully refreshed - Please try downloading again';
                 } else {
-                    $this->lastError = 'Access token expired and refresh failed - Admin needs to re-authenticate Dropbox account';
+                    $additionalInfo = $errorDetail ? ' (' . htmlspecialchars($errorDetail) . ')' : '';
+                    $this->lastError = 'Access token expired and refresh failed - Admin needs to re-authenticate Dropbox account' . $additionalInfo;
                 }
             } else if ($statusCode == 409) {
-                $this->lastError = 'Dropbox conflict error (HTTP 409) - File may be in use or locked';
+                $additionalInfo = $errorDetail ? ': ' . htmlspecialchars($errorDetail) : '';
+                $this->lastError = 'Dropbox conflict error (HTTP 409) - File may be in use or locked' . $additionalInfo;
             } else if ($statusCode == 429) {
                 $this->lastError = 'Dropbox rate limit exceeded (HTTP 429) - Too many requests, please try again later';
             } else {
-                $this->lastError = "Dropbox authentication error (HTTP {$statusCode}) - " . htmlspecialchars($e->getMessage());
+                $baseMsg = $e->getMessage();
+                $additionalInfo = $errorDetail ? ' - Details: ' . htmlspecialchars($errorDetail) : '';
+                $this->lastError = "Dropbox API error (HTTP {$statusCode})" . ($baseMsg ? ': ' . htmlspecialchars($baseMsg) : '') . $additionalInfo;
             }
             return false;
         } catch (\Exception $e) {
