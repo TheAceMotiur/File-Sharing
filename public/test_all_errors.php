@@ -45,23 +45,33 @@ echo "User sees: " . $service->getLastError() . "\n\n";
 // Test 3: Real file - should work or show real error
 echo "Test 3: Real File Download (ID 13 - og-default.jpg)\n";
 echo str_repeat('-', 60) . "\n";
-$db = getDBConnection();
-$stmt = $db->prepare("SELECT * FROM file_uploads WHERE id = ?");
-$fileId = 13;
-$stmt->bind_param("i", $fileId);
-$stmt->execute();
-$file3 = $stmt->get_result()->fetch_assoc();
 
-if ($file3) {
-    $result = $service->downloadFromDropbox($file3);
-    if ($result === false) {
-        echo "User sees: " . $service->getLastError() . "\n";
+try {
+    $db = getDBConnection();
+    $stmt = $db->prepare("SELECT * FROM file_uploads WHERE id = ?");
+    
+    if (!$stmt) {
+        echo "Database error: " . $db->error . "\n";
     } else {
-        echo "✅ SUCCESS: Downloaded " . number_format(strlen($result) / 1024, 2) . " KB\n";
-        echo "No error to show - file downloaded successfully\n";
+        $fileId = 13;
+        $stmt->bind_param("i", $fileId);
+        $stmt->execute();
+        $file3 = $stmt->get_result()->fetch_assoc();
+        
+        if ($file3) {
+            $result = $service->downloadFromDropbox($file3);
+            if ($result === false) {
+                echo "User sees: " . $service->getLastError() . "\n";
+            } else {
+                echo "✅ SUCCESS: Downloaded " . number_format(strlen($result) / 1024, 2) . " KB\n";
+                echo "No error to show - file downloaded successfully\n";
+            }
+        } else {
+            echo "File not found in database\n";
+        }
     }
-} else {
-    echo "File not found in database\n";
+} catch (Exception $e) {
+    echo "Exception: " . $e->getMessage() . "\n";
 }
 
 echo "\n" . str_repeat('=', 60) . "\n";
