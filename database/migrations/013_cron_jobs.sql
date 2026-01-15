@@ -21,5 +21,4 @@ INSERT INTO cron_jobs (name, description, command, schedule, is_active) VALUES
 ('Cleanup Local Files', 'Removes failed syncs and orphaned local files', 'php cron/cleanup_local_files.php', '0 * * * *', 1),
 ('Refresh Dropbox Tokens', 'Refreshes expired Dropbox access tokens', 'php cron/refresh_dropbox_tokens.php', '0 */6 * * *', 1),
 ('Cleanup Old Files', 'Removes files older than retention period', 'php cron/cleanup.php', '0 2 * * *', 1),
-('Cleanup Upload Chunks', 'Removes incomplete upload chunks', 'php cron/cleanup_chunks.php', '0 3 * * *', 1),
-('Cleanup Cache', 'Removes old cached files and manages cache size', 'php cron/cleanup_cache.php', '0 3 * * *', 1);
+('Cleanup Upload Chunks', 'Removes incomplete upload chunks', 'php cron/cleanup_chunks.php', '0 3 * * *', 1);

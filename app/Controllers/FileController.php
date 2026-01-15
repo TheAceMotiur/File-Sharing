@@ -147,68 +147,6 @@ class FileController extends Controller
     }
     
     /**
-     * Check if file exists in cache
-     */
-    private function getCachedFile($file)
-    {
-        $cacheDir = __DIR__ . '/../../cache/';
-        $cacheFile = $cacheDir . $file['unique_id'];
-        
-        if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
-        }
-        
-        if (file_exists($cacheFile)) {
-            // Verify cache file size matches
-            if (filesize($cacheFile) === (int)$file['size']) {
-                return $cacheFile;
-            } else {
-                // Cache corrupted, delete it
-                unlink($cacheFile);
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Serve file from cache
-     */
-    private function serveFromCache($cacheFile, $file)
-    {
-        // Set headers for download
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="' . $file['original_name'] . '"');
-        header('Content-Length: ' . filesize($cacheFile));
-        header('Cache-Control: no-cache, must-revalidate');
-        header('Pragma: public');
-        header('Accept-Ranges: bytes');
-        header('X-Served-From: cache');
-        
-        // Stream file with range support
-        $this->streamFile($cacheFile);
-        exit;
-    }
-    
-    /**
-     * Store file in cache
-     */
-    private function storeInCache($file, $content)
-    {
-        $cacheDir = __DIR__ . '/../../cache/';
-        $cacheFile = $cacheDir . $file['unique_id'];
-        
-        if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
-        }
-        
-        // Write to cache
-        file_put_contents($cacheFile, $content);
-        
-        return $cacheFile;
-    }
-    
-    /**
      * Download file from Dropbox (simplified - returns content only)
      */
     private function downloadFromDropbox($file)
@@ -316,7 +254,7 @@ class FileController extends Controller
     }
     
     /**
-     * Download file from local storage (and cache it)
+     * Download file from local storage
      */
     private function downloadFromLocal($file)
     {
@@ -325,12 +263,6 @@ class FileController extends Controller
         if (!file_exists($filePath)) {
             http_response_code(404);
             die('File not found on server');
-        }
-        
-        // Store in cache for future requests
-        $content = file_get_contents($filePath);
-        if ($content !== false) {
-            $this->storeInCache($file, $content);
         }
         
         // Set headers for download

@@ -55,23 +55,8 @@ try {
             continue;
         }
     }
-
-    // 2. Delete cache records older than 7 days
-    $stmt = $db->query("SELECT file_id, cache_path FROM file_downloads 
-                       WHERE last_cached < DATE_SUB(NOW(), INTERVAL 7 DAY)");
     
-    while ($row = $stmt->fetch_assoc()) {
-        // Delete cached file
-        if (file_exists($row['cache_path'])) {
-            unlink($row['cache_path']);
-        }
-    }
-    
-    // Clear cache database records
-    $db->query("DELETE FROM file_downloads 
-                WHERE last_cached < DATE_SUB(NOW(), INTERVAL 7 DAY)");
-    
-    // 3. Clean up orphaned database records
+    // 2. Clean up orphaned database records
     $db->query("DELETE FROM file_reports WHERE file_id NOT IN (SELECT file_id FROM file_uploads)");
     $db->query("DELETE FROM file_downloads WHERE file_id NOT IN (SELECT file_id FROM file_uploads)");
     

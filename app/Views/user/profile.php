@@ -7,68 +7,84 @@
     <link rel="icon" type="image/png" href="/icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php include __DIR__ . '/../partials/styles.php'; ?>
 </head>
-<body class="bg-gray-50">
-    <?php include __DIR__ . '/../partials/header.php'; ?>
+<body x-data="{ sidebarOpen: false }">
+    <?php 
+    $currentPage = 'profile';
+    include __DIR__ . '/../partials/header.php'; 
+    include __DIR__ . '/../partials/sidebar.php';
+    ?>
 
-    <div class="container mx-auto px-4 py-8 max-w-2xl">
-        <h1 class="text-3xl font-bold mb-8">Profile Settings</h1>
+    <div class="main-content">
+        <div class="min-h-screen py-8">
+        <div class="container mx-auto px-4 max-w-4xl">
+            <!-- Page Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <i class="fas fa-user-circle text-blue-600"></i>
+                    Profile Settings
+                </h1>
+                <p class="text-gray-600 mt-2">Manage your account settings and preferences</p>
+            </div>
 
         <?php if (isset($success)): ?>
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
-            <i class="fas fa-check-circle mr-2"></i><?php echo $success; ?>
+        <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 profile-card">
+            <i class="fas fa-check-circle"></i>
+            <span><?php echo $success; ?></span>
         </div>
         <?php endif; ?>
 
         <?php if (isset($error)): ?>
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            <i class="fas fa-exclamation-circle mr-2"></i><?php echo $error; ?>
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 profile-card">
+            <i class="fas fa-exclamation-circle"></i>
+            <span><?php echo $error; ?></span>
         </div>
         <?php endif; ?>
 
         <!-- Profile Information -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-6 flex items-center">
-                <i class="fas fa-user mr-2 text-blue-600"></i>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 profile-card">
+            <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
+                <i class="fas fa-user text-blue-600"></i>
                 Profile Information
             </h2>
 
             <form method="POST" action="/profile">
                 <div class="mb-4">
-                    <label for="name" class="block text-gray-700 font-medium mb-2">
-                        <i class="fas fa-user-circle mr-1"></i> Full Name
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-user-circle mr-1 text-gray-400"></i> Full Name
                     </label>
                     <input type="text" 
                            id="name" 
                            name="name" 
                            value="<?php echo htmlspecialchars($user['name']); ?>" 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                            required>
                 </div>
 
                 <div class="mb-6">
-                    <label for="email" class="block text-gray-700 font-medium mb-2">
-                        <i class="fas fa-envelope mr-1"></i> Email Address
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-envelope mr-1 text-gray-400"></i> Email Address
                     </label>
                     <input type="email" 
                            id="email" 
                            name="email" 
                            value="<?php echo htmlspecialchars($user['email']); ?>" 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                            required>
                 </div>
 
                 <button type="submit" 
-                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium">
+                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-md">
                     <i class="fas fa-save mr-2"></i>Update Profile
                 </button>
             </form>
         </div>
 
         <!-- Account Information -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-info-circle mr-2 text-green-600"></i>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 profile-card">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-info-circle text-green-600"></i>
                 Account Information
             </h2>
             
@@ -114,16 +130,24 @@
                 Change Password
             </h2>
             
+        <!-- Change Password -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 profile-card">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-lock text-orange-600"></i>
+                Change Password
+            </h2>
+            
             <a href="/reset-password" 
-               class="inline-block bg-orange-600 text-white py-2 px-6 rounded-lg hover:bg-orange-700 transition duration-200 font-medium">
-                <i class="fas fa-key mr-2"></i>Change Password
+               class="inline-flex items-center gap-2 bg-orange-600 text-white py-3 px-6 rounded-lg hover:bg-orange-700 transition-all font-medium shadow-sm hover:shadow-md">
+                <i class="fas fa-key"></i>
+                <span>Change Password</span>
             </a>
         </div>
 
         <!-- Danger Zone -->
-        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 flex items-center text-red-700">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 profile-card">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2 text-red-700">
+                <i class="fas fa-exclamation-triangle"></i>
                 Danger Zone
             </h2>
             
@@ -132,10 +156,12 @@
             </p>
             
             <button onclick="confirmDelete()" 
-                    class="bg-red-600 text-white py-2 px-6 rounded-lg hover:bg-red-700 transition duration-200 font-medium">
-                <i class="fas fa-trash-alt mr-2"></i>Delete Account
+                    class="inline-flex items-center gap-2 bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-all font-medium shadow-sm hover:shadow-md">
+                <i class="fas fa-trash-alt"></i>
+                <span>Delete Account</span>
             </button>
         </div>
+    </div>
     </div>
 
     <?php include __DIR__ . '/../partials/footer.php'; ?>

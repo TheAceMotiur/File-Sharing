@@ -59,9 +59,6 @@
                 <a href="/admin/cron-jobs" class="block px-8 py-2 hover:bg-gray-700 text-sm <?php echo ($currentPage ?? '') === 'cron-jobs' ? 'bg-gray-700' : ''; ?>">
                     <i class="fas fa-clock mr-2"></i> Cron Jobs
                 </a>
-                <a href="/admin/cache" class="block px-8 py-2 hover:bg-gray-700 text-sm <?php echo ($currentPage ?? '') === 'cache' ? 'bg-gray-700' : ''; ?>">
-                    <i class="fas fa-database mr-2"></i> Cache
-                </a>
             </div>
         </div>
 
@@ -106,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // System dropdown
-    if (['cron-jobs', 'cache'].includes(currentPage)) {
+    if (['cron-jobs'].includes(currentPage)) {
         toggleDropdown('system');
     }
 });

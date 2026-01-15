@@ -72,9 +72,3 @@ $router->get('admin/dropbox', 'AdminController@dropbox', [AdminMiddleware::class
 $router->post('admin/dropbox', 'AdminController@dropbox', [AdminMiddleware::class]);
 $router->get('admin/cron-jobs', 'AdminController@cronJobs', [AdminMiddleware::class]);
 $router->post('admin/cron-jobs', 'AdminController@cronJobs', [AdminMiddleware::class]);
-
-// Cache management
-$router->get('admin/cache', 'AdminController@cache', [AdminMiddleware::class]);
-$router->get('admin/cache/stats', 'AdminController@cacheStats', [AdminMiddleware::class]);
-$router->post('admin/cache/clear', 'AdminController@cacheClear', [AdminMiddleware::class]);
-$router->post('admin/cache/delete', 'AdminController@cacheDelete', [AdminMiddleware::class]);
