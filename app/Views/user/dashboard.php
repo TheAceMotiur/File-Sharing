@@ -342,7 +342,7 @@
             <!-- Folders -->
             <div v-for="folder in filteredFolders" 
                  :key="'folder-' + folder.id"
-                 @click="openFolder(folder)"
+                 @click.prevent="openFolder(folder)"
                  @contextmenu.prevent="showContextMenu($event, folder)"
                  class="item-card group cursor-pointer transform hover:scale-105 transition-all duration-200">
                 <div class="p-5">
