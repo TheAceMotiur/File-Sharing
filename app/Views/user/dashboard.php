@@ -317,15 +317,25 @@
                         <span>New Folder</span>
                     </button>
                 </div>
-                <nav v-else class="flex items-center text-sm">
-                    <button @click="currentFolder = null" 
-                            class="text-gray-600 hover:text-blue-600 flex items-center transition-colors duration-200 font-medium">
-                        <i class="fas fa-home mr-2"></i>
-                        My Drive
-                    </button>
-                    <i class="fas fa-chevron-right mx-3 text-gray-400"></i>
-                    <span class="text-gray-900 font-semibold">{{ currentFolder.name }}</span>
-                </nav>
+                <div v-else class="bg-blue-50 border border-blue-200 rounded-lg px-6 py-4">
+                    <nav class="flex items-center justify-between">
+                        <div class="flex items-center text-sm">
+                            <button @click="currentFolder = null" 
+                                    class="text-blue-600 hover:text-blue-700 flex items-center transition-colors duration-200 font-semibold">
+                                <i class="fas fa-home mr-2"></i>
+                                My Drive
+                            </button>
+                            <i class="fas fa-chevron-right mx-3 text-blue-400"></i>
+                            <span class="text-blue-900 font-bold text-base">{{ currentFolder.name }}</span>
+                        </div>
+                        <button @click="currentFolder = null"
+                                class="px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 rounded-lg transition-all duration-200 flex items-center gap-2">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back</span>
+                        </button>
+                    </nav>
+                    <p class="text-xs text-blue-600 mt-2">{{ filteredFolders.length + filteredFiles.length }} items in this folder</p>
+                </div>
             </div>
         
         <!-- Enhanced Loading State -->
@@ -342,9 +352,10 @@
             <!-- Folders -->
             <div v-for="folder in filteredFolders" 
                  :key="'folder-' + folder.id"
-                 @click.prevent="openFolder(folder)"
+                 @click="openFolder(folder)"
                  @contextmenu.prevent="showContextMenu($event, folder)"
-                 class="item-card group cursor-pointer transform hover:scale-105 transition-all duration-200">
+                 class="item-card group cursor-pointer transform hover:scale-105 transition-all duration-200"
+                 style="user-select: none;">
                 <div class="p-5">
                     <!-- Folder Header -->
                     <div class="flex items-center justify-between mb-4">
@@ -379,7 +390,7 @@
                     <div class="flex items-center justify-between mb-4">
                         <div class="w-12 h-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center group-hover:shadow-md transition-all duration-200">
                             <img v-if="isImage(file.original_name)" 
-                                 :src="'/uploads/' + file.unique_id" 
+                                 :src="'/info/' + file.unique_id" 
                                  :alt="file.original_name"
                                  class="w-full h-full object-cover rounded-xl"
                                  @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'">
@@ -887,8 +898,10 @@
                 return ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp'].includes(ext);
             },
             openFolder(folder) {
+                console.log('Opening folder:', folder);
                 this.currentFolder = folder;
                 this.searchQuery = '';
+                console.log('Current folder set to:', this.currentFolder);
             },
             handleFileClick(file) {
                 window.open('/info/' + file.unique_id, '_blank');
